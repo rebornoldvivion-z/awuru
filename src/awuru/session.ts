@@ -77,7 +77,7 @@ export const useSession = create<Session>((set, get) => ({
   shadows: [],
   signals: [],
   events: [],
-  now: Date.now(),
+  now: 0,
 
   hydrate: async () => {
     try {
