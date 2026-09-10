@@ -344,6 +344,7 @@ describe("v7.2 thesis notes", () => {
       userDecision: "WATCH" as const, direction: "short" as const, family: "trend" as const, state: "WATCH" as const,
       evidence: "ema", invalidation: "x", sourceQuality: "LIVE", engineVersion: ENGINE_VERSION,
       structureRead: "EXPANDING_RANGE" as const, whyNow: null, whyNot: "expanding",
+      watching: null, createdAt: 1, updatedAt: 1, ageMs: 0, change: null, changeReason: null,
     };
     const b = { ...a, structureRead: "BEARISH_STRUCTURE" as const, state: "TRIGGERED" as const, whyNow: "LH/LL confirmed" };
     const note = describeThesisShift(a, b);

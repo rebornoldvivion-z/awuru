@@ -396,7 +396,7 @@ if (process.argv[1]?.endsWith("validate-v77.ts")) {
     all.push(...rows);
     const is = rows.filter((r) => r.split === "IS").length;
     const oos = rows.filter((r) => r.split === "OOS").length;
-    const exp = EXPECTED[m.symbol];
+    const exp = EXPECTED[m.symbol as keyof typeof EXPECTED];
     const match = is === exp.IS && oos === exp.OOS;
     counts[m.symbol] = { IS: is, OOS: oos, match };
     console.error(JSON.stringify({ market: m.symbol, is, oos, match }));

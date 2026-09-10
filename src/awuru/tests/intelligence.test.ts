@@ -208,7 +208,9 @@ describe("thesis compare", () => {
     id: "thesis", asset: "BTC", at: 1, barOpen: 1, venue: "binance", regime: "TREND",
     userDecision: "WATCH", direction: "long", family: "breakout", state: "WATCH",
     evidence: "e", invalidation: "x", sourceQuality: "LIVE", engineVersion: "7.2.0",
-    structureRead: "BULLISH_STRUCTURE", whyNow: "e", whyNot: null, ...over,
+    structureRead: "BULLISH_STRUCTURE", whyNow: "e", whyNot: null,
+    watching: null, createdAt: 1, updatedAt: 1, ageMs: 0, change: null, changeReason: null,
+    ...over,
   });
   it("detects strengthen / reverse / new", () => {
     assert.equal(compareThesis(null, t({})), "NEW_SETUP");

@@ -408,7 +408,7 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
     all.push(...rows);
     const is = rows.filter((r) => r.t < IS_END);
     const oos = rows.filter((r) => r.t >= IS_END);
-    const base = V74_BASELINE[m.symbol];
+    const base = V74_BASELINE[m.symbol as keyof typeof V74_BASELINE];
     const dIs = baselineDelta(headline(is), base.IS);
     const dOos = baselineDelta(headline(oos), base.OOS);
     if (!dIs.match || !dOos.match) reproOk = false;

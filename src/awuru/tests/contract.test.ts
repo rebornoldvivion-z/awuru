@@ -343,7 +343,7 @@ describe("engine gates", () => {
     if (d.kind === "RELEASE") {
       assert.fail("tiny equity must not RELEASE");
     }
-    assert.ok(d.waitCode === "WAIT_UNSIZEABLE" || d.waitCode === "WAIT_REGIME" || d.waitCode === "WAIT_HTF" || d.waitCode === "WAIT_GEOMETRY" || d.waitCode === "WAIT_DISAGREEMENT" || d.waitCode === "WAIT_DATA" || d.waitCode === "WAIT_TRIGGER" || d.waitCode === "WAIT_EVIDENCE");
+    assert.ok(d.waitCode === "WAIT_UNSIZEABLE" || d.waitCode === "WAIT_REGIME" || d.waitCode === "WAIT_HTF" || d.waitCode === "WAIT_GEOMETRY" || d.waitCode === "WAIT_DISAGREEMENT" || d.waitCode === "WAIT_DATA" || d.waitCode === "WAIT_TRIGGER" || d.waitCode === "WAIT_EVIDENCE" || d.waitCode === "WAIT_QUARANTINE");
   });
 
   it("families are three distinct hypotheses", () => {
