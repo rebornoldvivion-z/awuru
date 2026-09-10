@@ -2,11 +2,17 @@ import type { ThesisChange } from "../domain/constants.ts";
 import { ENGINE_VERSION } from "../domain/constants.ts";
 import type { Decision, Thesis } from "../domain/types.ts";
 
-export function thesisFrom(d: Decision): Thesis {
+export function thesisIdFor(asset: string) {
+  return `thesis:${asset}`;
+}
+
+export function thesisFrom(d: Decision, prev?: Thesis | null): Thesis {
+  const now = d.decidedAt;
+  const created = prev?.asset === d.asset ? prev.createdAt : now;
   return {
-    id: "thesis",
+    id: thesisIdFor(d.asset),
     asset: d.asset,
-    at: d.decidedAt,
+    at: now,
     barOpen: d.barOpen,
     venue: d.venue,
     regime: d.regime?.kind ?? null,
@@ -21,6 +27,12 @@ export function thesisFrom(d: Decision): Thesis {
     structureRead: d.structure?.read ?? null,
     whyNow: d.whyNow,
     whyNot: d.whyNot,
+    watching: d.trigger,
+    createdAt: created,
+    updatedAt: now,
+    ageMs: now - created,
+    change: null,
+    changeReason: null,
   };
 }
 
@@ -35,6 +47,7 @@ export function compareThesis(prev: Thesis | null, next: Thesis): ThesisChange {
     if (next.state === "TRIGGERED" && prev.state !== "TRIGGERED") return "STRENGTHENED";
     if (next.state === "WATCH" && prev.state === "TRIGGERED") return "WEAKENED";
     if (next.state === "RELEASED" && prev.state !== "RELEASED") return "STRENGTHENED";
+    if (next.state === "CANDIDATE" && prev.state !== "CANDIDATE" && prev.state !== "RELEASED") return "STRENGTHENED";
     if (prev.structureRead && next.structureRead && prev.structureRead !== next.structureRead) return "NEW_SETUP";
     return "UNCHANGED";
   }

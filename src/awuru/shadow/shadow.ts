@@ -5,8 +5,20 @@ export function scoreShadow(shadow: Shadow, laterClosed: Candle[], nowMs: number
   const after = laterClosed.filter((c) => c.openTime > shadow.barOpen);
   let status: ShadowStatus = "open";
   let realizedR: number | null = null;
+  const risk = Math.abs(shadow.entry - shadow.stop);
+  let maeR = 0;
+  let mfeR = 0;
 
   for (const bar of after) {
+    if (risk > 0) {
+      if (shadow.direction === "long") {
+        maeR = Math.max(maeR, (shadow.entry - bar.low) / risk);
+        mfeR = Math.max(mfeR, (bar.high - shadow.entry) / risk);
+      } else {
+        maeR = Math.max(maeR, (bar.high - shadow.entry) / risk);
+        mfeR = Math.max(mfeR, (shadow.entry - bar.low) / risk);
+      }
+    }
     const hit = firstTouch(shadow.direction, shadow, bar);
     if (hit === "sl") {
       status = "sl";
@@ -46,7 +58,7 @@ export function scoreShadow(shadow: Shadow, laterClosed: Candle[], nowMs: number
     }
   }
 
-  return { ...shadow, status, realizedR, scoredAt: nowMs };
+  return { ...shadow, status, realizedR, scoredAt: nowMs, maeR, mfeR };
 }
 
 function expiryOf(shadow: Shadow): number {

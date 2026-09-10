@@ -3,7 +3,9 @@ import type {
   Account,
   AwuruEvent,
   LifecycleEvent,
+  MarketSnapshot,
   Mission,
+  Note,
   Profile,
   RiskDay,
   SetupRecord,
@@ -12,7 +14,7 @@ import type {
   Thesis,
 } from "../domain/types.ts";
 
-const STORES = ["profile", "accounts", "signals", "missions", "shadows", "risk_days", "events", "thesis", "lifecycle", "setups"] as const;
+const STORES = ["profile", "accounts", "signals", "missions", "shadows", "risk_days", "events", "thesis", "lifecycle", "setups", "snapshots", "notes"] as const;
 type StoreName = (typeof STORES)[number];
 
 function defaultProfile(): Profile {
@@ -40,7 +42,7 @@ function openDb(): Promise<IDBDatabase> {
       for (const name of STORES) {
         if (!db.objectStoreNames.contains(name)) {
           const key =
-            name === "profile" || name === "thesis"
+            name === "profile" || name === "thesis" || name === "snapshots"
               ? "id"
               : name === "signals"
                 ? "signalId"
@@ -179,12 +181,37 @@ export async function listEvents(): Promise<AwuruEvent[]> {
   return all.sort((a, b) => b.at - a.at);
 }
 
-export async function loadThesis(): Promise<Thesis | null> {
+export async function loadThesis(asset?: string): Promise<Thesis | null> {
+  if (asset) {
+    const keyed = await get<Thesis>("thesis", `thesis:${asset}`);
+    if (keyed) return keyed;
+  }
   return (await get<Thesis>("thesis", "thesis")) ?? null;
 }
 
 export async function saveThesis(t: Thesis): Promise<void> {
-  await put("thesis", t);
+  await put("thesis", { ...t, id: t.id || `thesis:${t.asset}` });
+}
+
+export async function saveSnapshot(s: MarketSnapshot): Promise<void> {
+  await put("snapshots", s);
+}
+
+export async function loadSnapshot(asset: string): Promise<MarketSnapshot | undefined> {
+  return get<MarketSnapshot>("snapshots", asset);
+}
+
+export async function listSnapshots(): Promise<MarketSnapshot[]> {
+  return getAll<MarketSnapshot>("snapshots");
+}
+
+export async function putNote(n: Note): Promise<void> {
+  await put("notes", n);
+}
+
+export async function listNotes(): Promise<Note[]> {
+  const all = await getAll<Note>("notes");
+  return all.sort((a, b) => b.at - a.at);
 }
 
 export async function addLifecycle(e: LifecycleEvent): Promise<void> {

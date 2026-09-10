@@ -159,6 +159,12 @@ export type Decision = {
   blockedByRisk: boolean;
   whyNow: string | null;
   whyNot: string | null;
+  researchStatus: {
+    family: import("./constants.ts").Family | null;
+    qualification: "UNVALIDATED" | "QUARANTINED" | "OBSERVATION" | "NONE";
+    note: string;
+    actionable: boolean;
+  };
 };
 
 export type StoredSignal = {
@@ -226,6 +232,8 @@ export type Shadow = {
   status: ShadowStatus;
   scoredAt: number | null;
   realizedR: number | null;
+  maeR?: number | null;
+  mfeR?: number | null;
 };
 
 export type Profile = {
@@ -381,6 +389,12 @@ export type Thesis = {
   structureRead: import("./constants.ts").StructureRead | null;
   whyNow: string | null;
   whyNot: string | null;
+  watching: string | null;
+  createdAt: number;
+  updatedAt: number;
+  ageMs: number;
+  change: import("./constants.ts").ThesisChange | null;
+  changeReason: string | null;
 };
 
 export type SetupRecord = {
@@ -411,5 +425,36 @@ export type LifecycleEvent = {
   engineVersion: string;
   asset: import("./constants.ts").Asset;
   barOpen: number | null;
+};
+
+export type Note = {
+  id: string;
+  at: number;
+  asset: import("./constants.ts").Asset | null;
+  thesisId: string | null;
+  body: string;
+};
+
+export type MarketSnapshot = {
+  id: import("./constants.ts").Asset;
+  asset: import("./constants.ts").Asset;
+  at: number;
+  userDecision: import("./constants.ts").UserDecision;
+  quality: string;
+  regime: string | null;
+  structure: string | null;
+  family: import("./constants.ts").Family | null;
+  research: string;
+  waitCode: string | null;
+  waitDetail: string | null;
+  instrument: string | null;
+  marketClass: string | null;
+  venue: string | null;
+  lastClosedOpen: number | null;
+  lastClose: number | null;
+  trigger: string | null;
+  invalidation: string | null;
+  changeNote: string | null;
+  lifecycle: import("./constants.ts").LifecycleState;
 };
 

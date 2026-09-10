@@ -14,7 +14,18 @@ export type LoadedTape = {
   corroboration: Corroboration | null;
 };
 
+const CACHE_MS = 30_000;
+const tapeCache = new Map<Asset, { at: number; tape: LoadedTape }>();
+
 export async function loadTape(asset: Asset, now: number): Promise<LoadedTape> {
+  const hit = tapeCache.get(asset);
+  if (hit && now - hit.at < CACHE_MS) return hit.tape;
+  const tape = await loadTapeFresh(asset, now);
+  tapeCache.set(asset, { at: now, tape });
+  return tape;
+}
+
+async function loadTapeFresh(asset: Asset, now: number): Promise<LoadedTape> {
   try {
     const res = await fetch(`/api/bundle?asset=${encodeURIComponent(asset)}`, {
       cache: "no-store",
