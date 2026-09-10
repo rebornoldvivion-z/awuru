@@ -1,5 +1,6 @@
-import { ENGINE_VERSION, marketCaption } from "@/awuru/constants.ts";
+import { BUILD_ID, ENGINE_VERSION, marketCaption } from "@/awuru/constants.ts";
 import { useSession } from "@/awuru/session.ts";
+import { corroborationLine } from "@/components/awuru/format.ts";
 
 export function AuditView() {
   const d = useSession((s) => s.decision);
@@ -22,13 +23,14 @@ export function AuditView() {
       </div>
       <section className="grid gap-3 md:grid-cols-2">
         <Fact k="Engine" v={ENGINE_VERSION} />
+        <Fact k="Build" v={BUILD_ID} />
         <Fact k="Role" v="market-data-proxy + browser intelligence" />
         <Fact k="Session" v={focused ? "focused — refresh at 15m close" : "unfocused — not monitoring"} />
         <Fact k="Gold" v="GOLD PROXY · PAXGUSDT — not XAUUSD" />
         <Fact k="TREND" v="Historically weak / unvalidated" />
         <Fact k="BREAKOUT" v="Quarantined from actionable release" />
         <Fact k="Sources" v="Binance Vision → Kraken → OKX" />
-        <Fact k="Corroboration" v={d?.corroboration?.reason ?? d?.corroboration?.status ?? "—"} />
+        <Fact k="Corroboration" v={corroborationLine(d ?? null)} />
         <Fact k="Primary venue" v={d?.venue ?? bundle?.venue ?? "—"} />
         <Fact k="Instrument" v={d ? marketCaption(d.asset, d.instrument, d.marketClass) : "—"} />
         <Fact k="15m closed" v={s15 ? new Date(s15.openTime).toISOString() : "—"} />
@@ -46,8 +48,8 @@ export function AuditView() {
           const c = cards[a];
           return (
             <p key={a} className="font-mono text-xs text-muted">
-              {a} · {c?.decision?.userDecision ?? c?.snapshot?.userDecision ?? "—"} · {c?.decision?.quality.state ?? c?.snapshot?.quality ?? "—"} ·{" "}
-              {c?.lastObserved ? "LAST OBSERVED" : "fresh"}
+              {a === "GOLD" ? "GOLD PROXY · PAXGUSDT" : a} · {c?.decision?.userDecision ?? c?.snapshot?.userDecision ?? "—"} ·{" "}
+              {c?.decision?.quality.state ?? c?.snapshot?.quality ?? "—"} · {c?.lastObserved ? "LAST OBSERVED" : "fresh"}
             </p>
           );
         })}

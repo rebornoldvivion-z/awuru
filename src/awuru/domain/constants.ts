@@ -1,4 +1,6 @@
 export const ENGINE_VERSION = "7.3.0";
+export const BUILD_ID = "cc-9f61d40.1";
+export const SURFACE = "command-center";
 export const APP_NAME = "AWURU v7 — Discipline Desk";
 export const DB_NAME = "awuru-v7";
 export const DB_VERSION = 4;

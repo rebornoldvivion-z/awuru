@@ -21,8 +21,10 @@ See `CONTRACT.md` and `ARCHITECTURE.md`.
 ## Tests
 
 ```
-node --experimental-strip-types --test src/awuru/awuru.test.ts src/awuru/tests/contract.test.ts src/awuru/tests/intelligence.test.ts src/awuru/tests/gold.test.ts src/awuru/tests/v72.test.ts src/awuru/tests/v73.test.ts src/awuru/tests/honesty.test.ts
+npm test
 ```
+
+Includes contract, gold, honesty, intelligence, v7.2, v7.3, and the v7.5–v7.7 classifiers. TREND remains historically weak / unvalidated. BREAKOUT remains quarantined.
 
 ## Limits
 

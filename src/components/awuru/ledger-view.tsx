@@ -10,6 +10,9 @@ export function LedgerView() {
   const thesis = useSession((s) => s.thesis);
   const cards = useSession((s) => s.cards);
   const addNote = useSession((s) => s.addNote);
+  const reject = useSession((s) => s.rejectCandidate);
+  const confirm = useSession((s) => s.confirmRelease);
+  const decision = useSession((s) => s.decision);
   const [body, setBody] = useState("");
 
   return (
@@ -18,7 +21,7 @@ export function LedgerView() {
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">Evaluation ledger</p>
         <h2 className="text-2xl font-medium tracking-tight">Ledger</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          Not trading P&L. Machine theses, human notes, shadow observation, and later path. Observation is not a user decision.
+          Not trading P&L. Machine theses, human notes, shadow observation, and later path. Notes never mutate engine truth.
         </p>
       </div>
       <form
@@ -40,6 +43,20 @@ export function LedgerView() {
           Attach note
         </Button>
       </form>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 px-4 text-xs"
+          onClick={() => void confirm()}
+          disabled={!(decision?.kind === "RELEASE" && decision.researchStatus.actionable)}
+        >
+          Accept current candidate
+        </Button>
+        <Button type="button" variant="outline" className="h-11 px-4 text-xs" onClick={() => void reject()}>
+          Record reject
+        </Button>
+      </div>
       <section className="grid gap-3 lg:grid-cols-2">
         <Block title="Machine theses">
           {(["BTC", "ETH", "GOLD"] as const).map((a) => {

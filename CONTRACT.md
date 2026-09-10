@@ -22,6 +22,8 @@ Trend RELEASE requires directional structure (HH/HL long or LH/LL short). Expand
 - BREAKOUT remains classified in family metadata. It is **QUARANTINED** from actionable BUY/SELL. Wait code `WAIT_QUARANTINE`.
 - Mean reversion is observational only.
 
+Public identity: `BUILD_ID` (`cc-9f61d40.1`) + engine `7.3.0` on `/api/health` and the desk chrome. Command Center is the home surface.
+
 ## Public API (data only)
 
 - `GET /api/health`

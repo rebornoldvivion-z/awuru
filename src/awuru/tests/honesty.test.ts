@@ -292,5 +292,9 @@ describe("server boundary — /api is observation transport only", () => {
         assert.equal(re.test(src), false, `${file} must not contain ${re}`);
       }
     }
+    const health = readFileSync(join(here, "../market/backend.ts"), "utf8");
+    assert.match(health, /build: BUILD_ID/);
+    assert.match(health, /intelligence: "browser"/);
+    assert.match(health, /role: "market-data-proxy"/);
   });
 });

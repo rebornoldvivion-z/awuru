@@ -8,9 +8,10 @@ type Props = {
   zone?: { low: number; high: number; type?: string } | null;
   invalidator?: number | null;
   lastClosed?: number | null;
+  lastClosedOpen?: number | null;
 };
 
-export function CandleChart({ candles, live, geometry, zone, invalidator, lastClosed }: Props) {
+export function CandleChart({ candles, live, geometry, zone, invalidator, lastClosed, lastClosedOpen }: Props) {
   const host = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -69,7 +70,7 @@ export function CandleChart({ candles, live, geometry, zone, invalidator, lastCl
           title,
           axisLabelVisible: true,
         });
-      if (lastClosed != null) mk(lastClosed, "#6a6a72", "CLOSE");
+      if (lastClosed != null) mk(lastClosed, "#6a6a72", "CLOSED");
       if (zone) {
         mk(zone.low, "#7d93a8", "ZONE LO");
         mk(zone.high, "#7d93a8", "ZONE HI");
@@ -81,6 +82,18 @@ export function CandleChart({ candles, live, geometry, zone, invalidator, lastCl
         mk(geometry.tp1, "#7d9a84", "TP1");
         if (geometry.tp2 != null) mk(geometry.tp2, "#7d9a84", "TP2");
         if (geometry.tp3 != null) mk(geometry.tp3, "#7d9a84", "TP3");
+      }
+      if (data.length) {
+        const last = data[data.length - 1]!;
+        lc.createSeriesMarkers(series, [
+          {
+            time: last.time,
+            position: "belowBar",
+            color: "#c8ccd4",
+            shape: "circle",
+            text: "LAST CLOSED",
+          },
+        ]);
       }
       if (live && data.length) {
         const t = Math.floor(live.openTime / 1000);
@@ -104,12 +117,14 @@ export function CandleChart({ candles, live, geometry, zone, invalidator, lastCl
     };
   }, [candles, live, geometry, zone, invalidator, lastClosed]);
 
+  const closedLabel = lastClosedOpen
+    ? `15m closed ${new Date(lastClosedOpen).toISOString().slice(11, 16)} UTC · forming wick display-only`
+    : `${candles.length} closed 15m · forming wick display-only`;
+
   return (
-    <div className="relative h-[320px] w-full overflow-hidden rounded-lg bg-surface md:h-[420px]">
+    <div className="relative h-[280px] w-full overflow-hidden rounded-lg bg-surface md:h-[400px]">
       <div ref={host} className="h-full w-full" />
-      <p className="pointer-events-none absolute bottom-2 left-3 z-10 font-mono text-[10px] uppercase tracking-wider text-subtle">
-        {candles.length} closed 15m · forming wick display-only
-      </p>
+      <p className="pointer-events-none absolute bottom-2 left-3 z-10 font-mono text-[10px] uppercase tracking-wider text-subtle">{closedLabel}</p>
     </div>
   );
 }

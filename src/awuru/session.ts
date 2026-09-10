@@ -144,6 +144,7 @@ type Session = {
   scan: (reason?: string) => Promise<void>;
   scanDesk: (reason?: string) => Promise<void>;
   confirmRelease: () => Promise<void>;
+  rejectCandidate: () => Promise<void>;
   savePersona: (p: Persona) => Promise<void>;
   saveGoal: (equity: number, target: number | null, deadline: string | null) => Promise<void>;
   setFocused: (on: boolean) => void;
@@ -435,7 +436,13 @@ export const useSession = create<Session>((set, get) => ({
         nextCloseAt: nextCloseMs(t),
       });
     } catch (err) {
-      set({ scanning: false, error: err instanceof Error ? err.message : "scan failed" });
+      const cards = get().cards;
+      const hasPrior = ASSETS.some((a) => cards[a]?.snapshot || cards[a]?.decision);
+      set({
+        scanning: false,
+        lastObserved: hasPrior,
+        error: err instanceof Error ? err.message : "scan failed — fresh observation unavailable",
+      });
     }
   },
 
@@ -496,6 +503,26 @@ export const useSession = create<Session>((set, get) => ({
       missions: await listMissions(),
       events: await listEvents(),
     });
+  },
+
+  rejectCandidate: async () => {
+    const { asset, thesis, decision } = get();
+    const label = decision?.userDecision ?? thesis?.userDecision ?? "observation";
+    const n: Note = {
+      id: newId("note"),
+      at: Date.now(),
+      asset,
+      thesisId: thesis?.id ?? thesisIdFor(asset),
+      body: `manual reject of ${label} — human evaluation, does not change engine truth`,
+    };
+    await putNote(n);
+    await addEvent({
+      id: newId("evt"),
+      at: Date.now(),
+      type: "reject",
+      detail: `manual reject ${asset} ${label} (engine unchanged)`,
+    });
+    set({ notes: await listNotes(), events: await listEvents() });
   },
 
   addNote: async (body) => {

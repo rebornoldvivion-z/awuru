@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { BookOpen, LayoutGrid, NotebookPen } from "lucide-react";
-import { ENGINE_VERSION } from "@/awuru/constants.ts";
+import { BUILD_ID, ENGINE_VERSION } from "@/awuru/constants.ts";
 import { useSession } from "@/awuru/session.ts";
 import { Palette } from "@/components/awuru/palette.tsx";
 import { cn } from "@/lib/utils.ts";
@@ -28,6 +28,7 @@ export function TerminalShell({ children }: { children: ReactNode }) {
   const nextCloseAt = useSession((s) => s.nextCloseAt);
   const scanning = useSession((s) => s.scanning);
   const pulse = useSession((s) => s.pulse);
+  const lastObserved = useSession((s) => s.lastObserved);
   const path = useRouterState({ select: (s) => s.location.pathname });
   const clock = useCountdown(nextCloseAt);
 
@@ -52,23 +53,28 @@ export function TerminalShell({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <div className="min-h-dvh bg-bg text-fg">
+    <div className="min-h-dvh bg-bg text-fg" data-awuru-build={BUILD_ID} data-awuru-engine={ENGINE_VERSION} data-awuru-surface="command-center">
       <header className="border-b border-border px-4 py-3 md:px-6">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-steel">Discipline desk</p>
             <h1 className="text-lg font-medium tracking-tight md:text-xl">AWURU v7</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={cn("rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider", focused ? "border-up/40 text-up" : "border-wait/40 text-wait")}>
-              {focused ? "session live" : "not monitoring"}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className={cn("rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider", focused ? "border-steel/40 text-steel" : "border-wait/40 text-wait")}>
+              {focused ? "focused" : "not monitoring"}
             </span>
+            {lastObserved && (
+              <span className="rounded-full border border-wait/40 px-2.5 py-1 font-mono text-[10px] uppercase text-wait">last observed</span>
+            )}
             <span className={cn("rounded-full border border-border px-2.5 py-1 font-mono text-[10px] tabular-nums", pulse ? "pulse-state text-fg" : "text-subtle")}>
               15m {clock}
             </span>
-            <span className="hidden font-mono text-[10px] text-subtle sm:inline">{ENGINE_VERSION}</span>
+            <span className="hidden font-mono text-[10px] text-subtle sm:inline">
+              {ENGINE_VERSION} · {BUILD_ID}
+            </span>
             <a href="/api/health" className="hidden rounded-full border border-border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-subtle sm:inline">
-              backend
+              proxy
             </a>
           </div>
         </div>
@@ -89,7 +95,15 @@ export function TerminalShell({ children }: { children: ReactNode }) {
           {scanning && <span className="ml-auto hidden items-center font-mono text-[10px] uppercase tracking-wider text-subtle sm:flex">updating</span>}
         </nav>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-5 md:px-6 md:py-8">{ready ? children : <p className="font-mono text-sm text-muted">Restoring last observed state…</p>}</main>
+      <main className="mx-auto max-w-7xl px-4 py-5 md:px-6 md:py-8">
+        {ready ? (
+          children
+        ) : lastObserved ? (
+          <p className="font-mono text-sm text-wait">Restoring last observed state…</p>
+        ) : (
+          <p className="font-mono text-sm text-muted">Opening the desk — fetching closed tape, not fabricating activity.</p>
+        )}
+      </main>
       <Palette />
     </div>
   );

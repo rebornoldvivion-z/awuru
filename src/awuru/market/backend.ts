@@ -1,10 +1,12 @@
 import {
   ASSETS,
   BINANCE_VISION,
+  BUILD_ID,
   ENGINE_VERSION,
   INTERVAL_MS,
   KRAKEN_PUBLIC,
   OKX_PUBLIC,
+  SURFACE,
   type Asset,
   type Venue,
 } from "../domain/constants.ts";
@@ -31,6 +33,10 @@ export type VenuePing = {
 export type HealthReport = {
   ok: boolean;
   engine: string;
+  build: string;
+  surface: string;
+  markets: readonly Asset[];
+  intelligence: "browser";
   role: "market-data-proxy";
   now: number;
   primary: Venue | null;
@@ -40,8 +46,10 @@ export type HealthReport = {
 export type BundleReport = {
   ok: boolean;
   engine: string;
+  build: string;
   asset: Asset;
   now: number;
+  cached: boolean;
   bundle: MtfBundle | null;
   failed: Venue[];
   errors: string[];
@@ -108,12 +116,19 @@ export async function healthReport(now = Date.now()): Promise<HealthReport> {
   return {
     ok: primary !== null,
     engine: ENGINE_VERSION,
+    build: BUILD_ID,
+    surface: SURFACE,
+    markets: ASSETS,
+    intelligence: "browser",
     role: "market-data-proxy",
     now,
     primary,
     venues,
   };
 }
+
+const BUNDLE_CACHE_MS = 35_000;
+const bundleCache = new Map<Asset, { at: number; bar: number; report: BundleReport }>();
 
 export function parseAsset(raw: string | null): Asset | null {
   if (!raw) return null;
@@ -122,18 +137,27 @@ export function parseAsset(raw: string | null): Asset | null {
 }
 
 export async function bundleReport(asset: Asset, now = Date.now()): Promise<BundleReport> {
+  const bar = Math.floor(now / INTERVAL_MS["15m"]);
+  const hit = bundleCache.get(asset);
+  if (hit && hit.bar === bar && now - hit.at < BUNDLE_CACHE_MS) {
+    return { ...hit.report, now, cached: true };
+  }
   const [loaded, snaps] = await Promise.all([loadMtfBundle(asset, now), loadSourceSnaps(asset, now)]);
   const corroboration = measureCorroboration(snaps, loaded.bundle?.venue ?? null);
-  return {
+  const report: BundleReport = {
     ok: loaded.bundle !== null,
     engine: ENGINE_VERSION,
+    build: BUILD_ID,
     asset,
     now,
+    cached: false,
     bundle: loaded.bundle,
     failed: loaded.failed,
     errors: loaded.errors,
     corroboration,
   };
+  bundleCache.set(asset, { at: now, bar, report });
+  return report;
 }
 
 export const CORS = {
