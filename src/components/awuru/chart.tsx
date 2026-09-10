@@ -5,9 +5,12 @@ type Props = {
   candles: Candle[];
   live: Candle | null;
   geometry: Geometry | null;
+  zone?: { low: number; high: number; type?: string } | null;
+  invalidator?: number | null;
+  lastClosed?: number | null;
 };
 
-export function CandleChart({ candles, live, geometry }: Props) {
+export function CandleChart({ candles, live, geometry, zone, invalidator, lastClosed }: Props) {
   const host = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,16 +60,22 @@ export function CandleChart({ candles, live, geometry }: Props) {
           close: bar.close,
         }));
       if (data.length) series.setData(data);
+      const mk = (price: number, color: string, title: string) =>
+        series.createPriceLine({
+          price,
+          color,
+          lineWidth: 1,
+          lineStyle: lc.LineStyle.SparseDotted,
+          title,
+          axisLabelVisible: true,
+        });
+      if (lastClosed != null) mk(lastClosed, "#6a6a72", "CLOSE");
+      if (zone) {
+        mk(zone.low, "#7d93a8", "ZONE LO");
+        mk(zone.high, "#7d93a8", "ZONE HI");
+      }
+      if (invalidator != null) mk(invalidator, "#c45c5c", "INV");
       if (geometry) {
-        const mk = (price: number, color: string, title: string) =>
-          series.createPriceLine({
-            price,
-            color,
-            lineWidth: 1,
-            lineStyle: lc.LineStyle.SparseDotted,
-            title,
-            axisLabelVisible: true,
-          });
         mk(geometry.entry, "#c8ccd4", "ENTRY");
         mk(geometry.stop, "#b07070", "SL");
         mk(geometry.tp1, "#7d9a84", "TP1");
@@ -93,7 +102,7 @@ export function CandleChart({ candles, live, geometry }: Props) {
       disposed = true;
       chart?.remove();
     };
-  }, [candles, live, geometry]);
+  }, [candles, live, geometry, zone, invalidator, lastClosed]);
 
   return (
     <div className="relative h-[320px] w-full overflow-hidden rounded-lg bg-surface md:h-[420px]">
