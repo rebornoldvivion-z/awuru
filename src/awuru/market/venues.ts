@@ -127,6 +127,9 @@ async function loadBinance(asset: Asset, now: number, fetchImpl: FetchLike): Pro
       symbol: meta.native,
       quote: meta.quote,
       timeframe: tf,
+      instrument: meta.instrument,
+      marketClass: meta.marketClass,
+      asset,
       candles: split.closed,
       live: split.live,
     };
@@ -135,7 +138,9 @@ async function loadBinance(asset: Asset, now: number, fetchImpl: FetchLike): Pro
   const info = await getJson(fetchImpl, infoUrl, "binance");
   const filters = parseFilters("binance", info, meta.native);
   if ("error" in filters) throw new VenueError("binance", filters.error);
-  return bundle("binance", asset, meta.native, meta.quote, series, filters, false, []);
+  filters.instrument = meta.instrument;
+  filters.marketClass = meta.marketClass;
+  return bundle("binance", asset, meta, series, filters, false, []);
 }
 
 async function loadKraken(asset: Asset, now: number, fetchImpl: FetchLike): Promise<MtfBundle> {
@@ -151,6 +156,9 @@ async function loadKraken(asset: Asset, now: number, fetchImpl: FetchLike): Prom
       symbol: meta.native,
       quote: meta.quote,
       timeframe: tf,
+      instrument: meta.instrument,
+      marketClass: meta.marketClass,
+      asset,
       candles: split.closed,
       live: split.live,
     };
@@ -158,7 +166,9 @@ async function loadKraken(asset: Asset, now: number, fetchImpl: FetchLike): Prom
   const info = await getJson(fetchImpl, `${KRAKEN_PUBLIC}/AssetPairs?pair=${meta.native}`, "kraken");
   const filters = parseFilters("kraken", info, meta.native);
   if ("error" in filters) throw new VenueError("kraken", filters.error);
-  return bundle("kraken", asset, meta.native, meta.quote, series, filters, false, []);
+  filters.instrument = meta.instrument;
+  filters.marketClass = meta.marketClass;
+  return bundle("kraken", asset, meta, series, filters, false, []);
 }
 
 async function loadOkx(asset: Asset, now: number, fetchImpl: FetchLike): Promise<MtfBundle> {
@@ -174,6 +184,9 @@ async function loadOkx(asset: Asset, now: number, fetchImpl: FetchLike): Promise
       symbol: meta.native,
       quote: meta.quote,
       timeframe: tf,
+      instrument: meta.instrument,
+      marketClass: meta.marketClass,
+      asset,
       candles: split.closed,
       live: split.live,
     };
@@ -185,20 +198,32 @@ async function loadOkx(asset: Asset, now: number, fetchImpl: FetchLike): Promise
   );
   const filters = parseFilters("okx", info, meta.native);
   if ("error" in filters) throw new VenueError("okx", filters.error);
-  return bundle("okx", asset, meta.native, meta.quote, series, filters, false, []);
+  filters.instrument = meta.instrument;
+  filters.marketClass = meta.marketClass;
+  return bundle("okx", asset, meta, series, filters, false, []);
 }
 
 function bundle(
   venue: Venue,
   asset: Asset,
-  symbol: string,
-  quote: string,
+  meta: { native: string; quote: string; instrument: string; marketClass: import("../domain/constants.ts").MarketClass },
   series: Record<Timeframe, Series>,
   filters: InstrumentFilters,
   switched: boolean,
   failedVenues: Venue[],
 ): MtfBundle {
-  return { venue, asset, symbol, quote, series, filters, switched, failedVenues };
+  return {
+    venue,
+    asset,
+    symbol: meta.native,
+    quote: meta.quote,
+    instrument: meta.instrument,
+    marketClass: meta.marketClass,
+    series,
+    filters,
+    switched,
+    failedVenues,
+  };
 }
 
 const LOADERS: Record<Venue, (asset: Asset, now: number, fetchImpl: FetchLike) => Promise<MtfBundle>> = {

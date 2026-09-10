@@ -3,6 +3,7 @@ import type {
   DecisionKind,
   EvidenceGrade,
   Family,
+  MarketClass,
   Persona,
   QualityState,
   Timeframe,
@@ -28,6 +29,9 @@ export type SeriesId = {
   symbol: string;
   quote: string;
   timeframe: Timeframe;
+  instrument: string;
+  marketClass: MarketClass;
+  asset: Asset;
 };
 
 export type Series = SeriesId & {
@@ -46,6 +50,8 @@ export type InstrumentFilters = {
   minNotional: number | null;
   status: string;
   tradable: boolean;
+  instrument: string;
+  marketClass: MarketClass;
 };
 
 export type Quality = {
@@ -108,6 +114,8 @@ export type Decision = {
   venue: Venue | null;
   symbol: string | null;
   quote: string | null;
+  instrument: string | null;
+  marketClass: import("./constants.ts").MarketClass | null;
   timeframe: Timeframe;
   barOpen: number | null;
   direction: Direction | null;
@@ -239,6 +247,8 @@ export type MtfBundle = {
   asset: Asset;
   symbol: string;
   quote: string;
+  instrument: string;
+  marketClass: MarketClass;
   series: Record<Timeframe, Series>;
   filters: InstrumentFilters;
   switched: boolean;

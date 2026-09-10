@@ -54,7 +54,9 @@ Thesis memory in IndexedDB. Compare UNCHANGED / STRENGTHENED / WEAKENED / INVALI
 
 ## Product
 
-WAIT-first mentor. Manual confirmation. BTC + ETH. IndexedDB. Four surfaces.
+WAIT-first mentor. Manual confirmation. **Core markets: BTC, ETH, Gold.** IndexedDB. Four surfaces.
+
+Gold is a core market. Current verified public path is **tokenized gold (PAXG)** labeled `GOLD PROXY · PAXGUSDT` (fallback PAXGUSD / PAXG-USDT). That is not XAUUSD. XAUUSD_SPOT remains a separate identity and is currently UNAVAILABLE. Do not stitch PAXG venues/quotes. SOL and OIL remain POST-V7.
 
 ## Host
 

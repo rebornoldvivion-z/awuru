@@ -1,7 +1,7 @@
 # AWURU v7 — Architecture
 
 Product: **AWURU v7 — Discipline Desk**  
-Engine **7.1.0** — terminal intelligence on Model B.
+Engine **7.1.1** — terminal intelligence on Model B. Core markets: **BTC, ETH, GOLD**.
 
 ```
 USER (Desk focused)

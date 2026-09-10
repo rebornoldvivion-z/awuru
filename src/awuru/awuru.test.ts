@@ -70,6 +70,8 @@ const filters: InstrumentFilters = {
   minNotional: 5,
   status: "TRADING",
   tradable: true,
+  instrument: "BTCUSDT",
+  marketClass: "CRYPTO_SPOT",
 };
 
 function profile(over: Partial<Profile> = {}): Profile {
@@ -338,6 +340,8 @@ describe("engine contract", () => {
       asset: "BTC",
       symbol: "BTCUSDT",
       quote: "USDT",
+      instrument: "BTCUSDT",
+      marketClass: "CRYPTO_SPOT",
       switched: false,
       failedVenues: [],
       filters,
@@ -347,6 +351,9 @@ describe("engine contract", () => {
           symbol: "BTCUSDT",
           quote: "USDT",
           timeframe: "15m",
+          instrument: "XBTUSD",
+          marketClass: "CRYPTO_SPOT",
+          asset: "BTC",
           candles: candles15.slice(0, 10),
           live: null,
         },
@@ -355,6 +362,9 @@ describe("engine contract", () => {
           symbol: "BTCUSDT",
           quote: "USDT",
           timeframe: "1h",
+          instrument: "XBTUSD",
+          marketClass: "CRYPTO_SPOT",
+          asset: "BTC",
           candles: rising(now - 80 * IV1H, 70, IV1H, 100),
           live: null,
         },
@@ -363,6 +373,9 @@ describe("engine contract", () => {
           symbol: "BTCUSDT",
           quote: "USDT",
           timeframe: "4h",
+          instrument: "XBTUSD",
+          marketClass: "CRYPTO_SPOT",
+          asset: "BTC",
           candles: rising(now - 50 * IV4H, 45, IV4H, 100),
           live: null,
         },
@@ -394,13 +407,15 @@ describe("engine contract", () => {
       asset: "BTC",
       symbol: "BTCUSDT",
       quote: "USDT",
+      instrument: "BTCUSDT",
+      marketClass: "CRYPTO_SPOT",
       switched: false,
       failedVenues: [],
       filters,
       series: {
-        "15m": { venue: "binance", symbol: "BTCUSDT", quote: "USDT", timeframe: "15m", candles: c15, live: null },
-        "1h": { venue: "binance", symbol: "BTCUSDT", quote: "USDT", timeframe: "1h", candles: c1h, live: null },
-        "4h": { venue: "binance", symbol: "BTCUSDT", quote: "USDT", timeframe: "4h", candles: c4h, live: null },
+        "15m": { venue: "binance", symbol: "BTCUSDT", quote: "USDT", timeframe: "15m", instrument: "BTCUSDT", marketClass: "CRYPTO_SPOT", asset: "BTC", candles: c15, live: null },
+        "1h": { venue: "binance", symbol: "BTCUSDT", quote: "USDT", timeframe: "1h", instrument: "BTCUSDT", marketClass: "CRYPTO_SPOT", asset: "BTC", candles: c1h, live: null },
+        "4h": { venue: "binance", symbol: "BTCUSDT", quote: "USDT", timeframe: "4h", instrument: "BTCUSDT", marketClass: "CRYPTO_SPOT", asset: "BTC", candles: c4h, live: null },
       },
     };
     const a = decide({ bundle, profile: profile(), riskDay: emptyRiskDay("2026-01-15"), now });
@@ -431,15 +446,20 @@ describe("engine contract", () => {
       asset: "BTC",
       symbol: "XBTUSD",
       quote: "USD",
+      instrument: "XBTUSD",
+      marketClass: "CRYPTO_SPOT",
       switched: true,
       failedVenues: ["binance"],
-      filters: { ...filters, venue: "kraken", symbol: "XBTUSD", quote: "USD" },
+      filters: { ...filters, venue: "kraken", symbol: "XBTUSD", quote: "USD", instrument: "XBTUSD" },
       series: {
         "15m": {
           venue: "kraken",
           symbol: "XBTUSD",
           quote: "USD",
           timeframe: "15m",
+          instrument: "XBTUSD",
+          marketClass: "CRYPTO_SPOT",
+          asset: "BTC",
           candles: rising(now - 20 * IV15, 20, IV15, 90_000),
           live: null,
         },
@@ -448,6 +468,9 @@ describe("engine contract", () => {
           symbol: "XBTUSD",
           quote: "USD",
           timeframe: "1h",
+          instrument: "XBTUSD",
+          marketClass: "CRYPTO_SPOT",
+          asset: "BTC",
           candles: rising(now - 20 * IV1H, 20, IV1H, 90_000),
           live: null,
         },
@@ -456,6 +479,9 @@ describe("engine contract", () => {
           symbol: "XBTUSD",
           quote: "USD",
           timeframe: "4h",
+          instrument: "XBTUSD",
+          marketClass: "CRYPTO_SPOT",
+          asset: "BTC",
           candles: rising(now - 20 * IV4H, 20, IV4H, 90_000),
           live: null,
         },
@@ -531,7 +557,7 @@ describe("idempotent signal ids", () => {
       persona: "Orion",
     });
     assert.equal(a, b);
-    assert.ok(a.includes("7.1.0"));
+    assert.ok(a.includes("7.1.1"));
   });
 });
 

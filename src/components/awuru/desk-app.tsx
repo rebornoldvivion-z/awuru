@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { BookOpen, LayoutGrid, NotebookPen, ScanLine, Shield } from "lucide-react";
-import { ASSETS, ENGINE_VERSION, PERSONA_POLICY, PERSONAS, type Asset, type Persona } from "@/awuru/constants.ts";
+import { ASSETS, ENGINE_VERSION, PERSONA_POLICY, PERSONAS, marketCaption, type Asset, type Persona } from "@/awuru/constants.ts";
 import { familyLabel } from "@/awuru/families.ts";
 import { useSession } from "@/awuru/session.ts";
 import { formatClock, formatUtc } from "@/awuru/time.ts";
@@ -249,7 +249,9 @@ function DeskSurface(props: {
             {props.scanning ? "Updating…" : "Scan closed bars"}
           </Button>
           <p className="font-mono text-xs text-muted">
-            {props.bundle ? `${props.bundle.venue} · ${props.bundle.symbol}` : "no venue"}
+            {props.bundle
+              ? `${marketCaption(props.bundle.asset, props.bundle.instrument, props.bundle.marketClass)} · ${props.bundle.venue}`
+              : "no venue"}
             {props.nextCloseAt ? ` · next close ${formatClock(props.nextCloseAt)}` : ""}
           </p>
         </div>
@@ -282,6 +284,8 @@ function DeskSurface(props: {
       </section>
       <aside className="space-y-3">
         <Panel title="Market">
+          <Row k="Market" v={props.bundle ? marketCaption(props.bundle.asset, props.bundle.instrument, props.bundle.marketClass) : "—"} />
+          <Row k="Instrument" v={props.bundle?.instrument ?? "—"} />
           <Row k="Feed" v={props.bundle ? `${props.bundle.venue} · ${props.bundle.symbol}` : "—"} />
           <Row k="Backend" v={props.dataSource === "server" ? "LIVE proxy" : props.dataSource === "client" ? "browser fallback" : "—"} />
           <Row k="Corroboration" v={d?.corroboration?.status ?? "—"} />
@@ -407,7 +411,8 @@ function JournalSurface(props: {
               {m.symbol} {m.direction} · {m.status}
             </p>
             <p className="text-xs text-muted">
-              {m.venue} · R {m.realizedR ?? "open"} · {m.engineVersion}
+              {m.symbol.includes("PAXG") ? "GOLD PROXY · " : ""}
+              {m.venue} · {m.symbol} · R {m.realizedR ?? "open"} · {m.engineVersion}
             </p>
           </div>
         ))}
@@ -421,7 +426,8 @@ function JournalSurface(props: {
               {s.symbol} {s.direction} · {s.status}
             </p>
             <p className="text-xs text-muted">
-              {s.waitCode} · {s.family} · {s.venue} · {s.engineVersion}
+              {s.symbol.includes("PAXG") ? "GOLD PROXY · " : ""}
+              {s.waitCode} · {s.family} · {s.venue} · {s.symbol} · {s.engineVersion}
             </p>
           </div>
         ))}
@@ -457,7 +463,8 @@ function AcademySurface() {
     { t: "Native MTF, one venue", b: "15m, 1h and 4h come from a single venue. At 10:15 UTC the last closed 4h is 04:00. HTF opposition downgrades a candidate to WATCH instead of deleting it." },
     { t: "Corroboration is not a vote", b: "Binance, Kraken and OKX are compared for spread and timestamps. They never vote BUY. Divergence is WAIT. Histories are never stitched." },
     { t: "Session, not a daemon", b: "While Desk is focused, analysis refreshes at each 15m close. When the tab is hidden or closed, AWURU is not watching the market." },
-    { t: "What this is not", b: "Not a broker. Not 24/7 monitoring. Not a profit guarantee. Not an LLM decider. SOL, XAU and OIL are not in v7." },
+    { t: "Gold is a core market", b: "BTC, ETH, and Gold are always on the desk. Current free/public Gold is tokenized PAXG, labeled GOLD PROXY. That is not XAUUSD spot. XAUUSD remains a separate identity and is currently unavailable without a new account." },
+    { t: "What this is not", b: "Not a broker. Not 24/7 monitoring. Not a profit guarantee. Not an LLM decider. SOL and OIL remain post-v7." },
   ];
   return (
     <div className="mx-auto max-w-2xl space-y-4">

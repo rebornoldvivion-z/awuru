@@ -1,4 +1,5 @@
 import { familyLabel } from "@/awuru/families.ts";
+import { marketCaption } from "@/awuru/constants.ts";
 import { formatClock } from "@/awuru/time.ts";
 import type { Candidate, Decision, Shadow } from "@/awuru/types.ts";
 import { cn } from "@/lib/utils.ts";
@@ -48,6 +49,11 @@ export function ThesisCard(props: {
       <div className={cn("rounded-xl border px-4 py-3", tone(d?.userDecision ?? "WAIT"))}>
         <p className="font-mono text-[10px] uppercase tracking-[0.2em]">Decision</p>
         <p className="mt-1 text-2xl font-medium tracking-tight">{d?.userDecision ?? "WAIT"}</p>
+        {d && (
+          <p className="mt-1 font-mono text-xs opacity-80">
+            {marketCaption(d.asset, d.instrument, d.marketClass)}
+          </p>
+        )}
         <p className="mt-1 text-sm opacity-80">{d?.waitDetail ?? d?.quality.reason ?? "Awaiting first analysis."}</p>
         {d?.blockedByRisk && <p className="mt-2 text-xs">Valid setup — blocked by risk. Not absent.</p>}
       </div>

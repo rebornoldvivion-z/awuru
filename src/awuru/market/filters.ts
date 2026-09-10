@@ -49,6 +49,8 @@ export function parseBinanceFilters(
     minNotional: minNotional && minNotional > 0 ? minNotional : null,
     status: row.status,
     tradable: row.status === "TRADING",
+    instrument: symbol,
+    marketClass: "CRYPTO_SPOT",
   };
 }
 
@@ -87,6 +89,8 @@ export function parseKrakenFilters(
     minNotional: costmin > 0 ? costmin : null,
     status,
     tradable: status === "online" || status === "",
+    instrument: native,
+    marketClass: "CRYPTO_SPOT",
   };
 }
 
@@ -124,6 +128,8 @@ export function parseOkxFilters(
     minNotional: null,
     status: row.state,
     tradable: row.state === "live",
+    instrument: instId,
+    marketClass: "CRYPTO_SPOT",
   };
 }
 

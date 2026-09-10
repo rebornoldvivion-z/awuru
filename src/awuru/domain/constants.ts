@@ -1,10 +1,12 @@
-export const ENGINE_VERSION = "7.1.0";
+export const ENGINE_VERSION = "7.1.1";
 export const APP_NAME = "AWURU v7 — Discipline Desk";
 export const DB_NAME = "awuru-v7";
 export const DB_VERSION = 2;
 
-export const ASSETS = ["BTC", "ETH"] as const;
+export const ASSETS = ["BTC", "ETH", "GOLD"] as const;
 export type Asset = (typeof ASSETS)[number];
+
+export const POST_V7_MARKETS = ["SOL", "OIL"] as const;
 
 export const TIMEFRAMES = ["15m", "1h", "4h"] as const;
 export type Timeframe = (typeof TIMEFRAMES)[number];
@@ -131,23 +133,43 @@ export const BINANCE_VISION = "https://data-api.binance.vision";
 export const KRAKEN_PUBLIC = "https://api.kraken.com/0/public";
 export const OKX_PUBLIC = "https://www.okx.com/api/v5";
 
+export const MARKET_CLASSES = ["CRYPTO_SPOT", "TOKENIZED_GOLD_PROXY", "XAUUSD_SPOT"] as const;
+export type MarketClass = (typeof MARKET_CLASSES)[number];
+
+export const GOLD_INSTRUMENTS = ["PAXGUSDT", "PAXGUSD", "PAXG-USDT", "XAUUSD_SPOT"] as const;
+export type GoldInstrument = (typeof GOLD_INSTRUMENTS)[number];
+
 export const VENUE_SYMBOLS: Record<
   Venue,
-  Record<Asset, { native: string; quote: string; base: string }>
+  Record<Asset, { native: string; quote: string; base: string; instrument: string; marketClass: MarketClass }>
 > = {
   binance: {
-    BTC: { native: "BTCUSDT", quote: "USDT", base: "BTC" },
-    ETH: { native: "ETHUSDT", quote: "USDT", base: "ETH" },
+    BTC: { native: "BTCUSDT", quote: "USDT", base: "BTC", instrument: "BTCUSDT", marketClass: "CRYPTO_SPOT" },
+    ETH: { native: "ETHUSDT", quote: "USDT", base: "ETH", instrument: "ETHUSDT", marketClass: "CRYPTO_SPOT" },
+    GOLD: { native: "PAXGUSDT", quote: "USDT", base: "PAXG", instrument: "PAXGUSDT", marketClass: "TOKENIZED_GOLD_PROXY" },
   },
   kraken: {
-    BTC: { native: "XBTUSD", quote: "USD", base: "XBT" },
-    ETH: { native: "ETHUSD", quote: "USD", base: "ETH" },
+    BTC: { native: "XBTUSD", quote: "USD", base: "XBT", instrument: "XBTUSD", marketClass: "CRYPTO_SPOT" },
+    ETH: { native: "ETHUSD", quote: "USD", base: "ETH", instrument: "ETHUSD", marketClass: "CRYPTO_SPOT" },
+    GOLD: { native: "PAXGUSD", quote: "USD", base: "PAXG", instrument: "PAXGUSD", marketClass: "TOKENIZED_GOLD_PROXY" },
   },
   okx: {
-    BTC: { native: "BTC-USDT", quote: "USDT", base: "BTC" },
-    ETH: { native: "ETH-USDT", quote: "USDT", base: "ETH" },
+    BTC: { native: "BTC-USDT", quote: "USDT", base: "BTC", instrument: "BTC-USDT", marketClass: "CRYPTO_SPOT" },
+    ETH: { native: "ETH-USDT", quote: "USDT", base: "ETH", instrument: "ETH-USDT", marketClass: "CRYPTO_SPOT" },
+    GOLD: { native: "PAXG-USDT", quote: "USDT", base: "PAXG", instrument: "PAXG-USDT", marketClass: "TOKENIZED_GOLD_PROXY" },
   },
 };
+
+export function seriesIdentity(asset: Asset, venue: Venue, instrument: string, tf: Timeframe): string {
+  return `${asset.toLowerCase()}:${venue}:${instrument}:${tf}`;
+}
+
+export function marketCaption(asset: Asset, instrument: string | null, marketClass: MarketClass | null): string {
+  if (asset !== "GOLD") return asset;
+  if (!instrument || marketClass === "XAUUSD_SPOT") return "GOLD · XAUUSD UNAVAILABLE";
+  if (marketClass === "TOKENIZED_GOLD_PROXY" || instrument.startsWith("PAXG")) return `GOLD PROXY · ${instrument}`;
+  return `GOLD · ${instrument}`;
+}
 
 export const BINANCE_INTERVAL: Record<Timeframe, string> = {
   "15m": "15m",

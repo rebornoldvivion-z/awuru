@@ -51,6 +51,8 @@ const filters: InstrumentFilters = {
   minNotional: 5,
   status: "TRADING",
   tradable: true,
+  instrument: "BTCUSDT",
+  marketClass: "CRYPTO_SPOT",
 };
 
 function profile(over: Partial<Profile> = {}): Profile {
@@ -75,13 +77,15 @@ function liveBundle(now: number): MtfBundle {
     asset: "BTC",
     symbol: "BTCUSDT",
     quote: "USDT",
+    instrument: "BTCUSDT",
+    marketClass: "CRYPTO_SPOT",
     switched: false,
     failedVenues: [],
     filters,
     series: {
-      "15m": { venue: "binance", symbol: "BTCUSDT", quote: "USDT", timeframe: "15m", candles: rising(last15 - 99 * IV15, 100, IV15, 90_000), live: null },
-      "1h": { venue: "binance", symbol: "BTCUSDT", quote: "USDT", timeframe: "1h", candles: rising(last1h - 69 * IV1H, 70, IV1H, 90_000), live: null },
-      "4h": { venue: "binance", symbol: "BTCUSDT", quote: "USDT", timeframe: "4h", candles: rising(last4h - 44 * IV4H, 45, IV4H, 90_000), live: null },
+      "15m": { venue: "binance", symbol: "BTCUSDT", quote: "USDT", timeframe: "15m", instrument: "BTCUSDT", marketClass: "CRYPTO_SPOT", asset: "BTC", candles: rising(last15 - 99 * IV15, 100, IV15, 90_000), live: null },
+      "1h": { venue: "binance", symbol: "BTCUSDT", quote: "USDT", timeframe: "1h", instrument: "BTCUSDT", marketClass: "CRYPTO_SPOT", asset: "BTC", candles: rising(last1h - 69 * IV1H, 70, IV1H, 90_000), live: null },
+      "4h": { venue: "binance", symbol: "BTCUSDT", quote: "USDT", timeframe: "4h", instrument: "BTCUSDT", marketClass: "CRYPTO_SPOT", asset: "BTC", candles: rising(last4h - 44 * IV4H, 45, IV4H, 90_000), live: null },
     },
   };
 }

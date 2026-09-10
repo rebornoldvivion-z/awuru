@@ -60,6 +60,8 @@ function waitDecision(partial: Partial<Decision>): Decision {
     venue: null,
     symbol: null,
     quote: null,
+    instrument: null,
+    marketClass: null,
     timeframe: PRIMARY_TF,
     barOpen: null,
     direction: null,
@@ -98,6 +100,8 @@ function qualityDecision(
     venue: quality.venue,
     symbol: null,
     quote: null,
+    instrument: null,
+    marketClass: null,
     timeframe: PRIMARY_TF,
     barOpen: quality.lastClosedOpen,
     direction: null,
@@ -152,7 +156,7 @@ export function decide(args: {
   const bundle = args.bundle;
   for (const tf of TIMEFRAMES) {
     const series = bundle.series[tf];
-    if (!series || series.venue !== bundle.venue) {
+    if (!series || series.venue !== bundle.venue || series.instrument !== bundle.instrument) {
       return qualityDecision(
         {
           state: "INVALID",
@@ -179,6 +183,8 @@ export function decide(args: {
     venue: bundle.venue,
     symbol: bundle.symbol,
     quote: bundle.quote,
+    instrument: bundle.instrument,
+    marketClass: bundle.marketClass,
     timeframe: PRIMARY_TF,
     persona,
     quality,
@@ -439,6 +445,8 @@ export function decide(args: {
     venue: bundle.venue,
     symbol: bundle.symbol,
     quote: bundle.quote,
+    instrument: bundle.instrument,
+    marketClass: bundle.marketClass,
     timeframe: PRIMARY_TF,
     barOpen: last15.openTime,
     direction: dir,
