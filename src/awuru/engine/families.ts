@@ -8,8 +8,9 @@ import {
   readLabel,
   structureInvalidation,
 } from "./structure.ts";
-import { continuationZone } from "./zones.ts";
 import { measureRetrace } from "./retrace.ts";
+import { continuationZone } from "./zones.ts";
+import { isActionableFamily } from "./honesty.ts";
 
 function gradeFrom(score: number): EvidenceGrade {
   if (score >= 0.75) return "strong";
@@ -326,7 +327,7 @@ export function evaluateFamilies(
 }
 
 export function pickPrimary(families: FamilyEvidence[]): FamilyEvidence | null {
-  const eligible = families.filter((f) => f.eligible && f.direction);
+  const eligible = families.filter((f) => f.eligible && f.direction && isActionableFamily(f.family));
   if (eligible.length === 0) return null;
   const dirs = new Set(eligible.map((f) => f.direction));
   if (dirs.size > 1) return null;

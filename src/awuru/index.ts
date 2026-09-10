@@ -20,6 +20,7 @@ export * from "./risk/risk.ts";
 export * from "./engine/ids.ts";
 export * from "./market/venues.ts";
 export * from "./market/backend.ts";
+export * from "./engine/honesty.ts";
 export * from "./engine/engine.ts";
 export * from "./shadow/shadow.ts";
 export * from "./persistence/memory.ts";

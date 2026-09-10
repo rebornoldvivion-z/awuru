@@ -32,6 +32,7 @@ import { sizePosition } from "../risk/sizing.ts";
 import { readStructure } from "./structure.ts";
 import { classifyRegime } from "./regime.ts";
 import { buildCandidates, pickSlots } from "./candidates.ts";
+import { isActionableFamily, quarantinedEligible, researchStatusFor } from "./honesty.ts";
 
 const intel = {
   userDecision: "WAIT" as UserDecision,
@@ -45,12 +46,13 @@ const intel = {
   corroboration: null as Corroboration | null,
   thesis: null as Decision["thesis"],
   thesisChange: null as Decision["thesisChange"],
-  lifecycle: "WATCH" as Decision["lifecycle"],
+  lifecycle: "OBSERVING" as Decision["lifecycle"],
   trigger: null as string | null,
   invalidation: null as string | null,
   blockedByRisk: false,
   whyNow: null as string | null,
   whyNot: null as string | null,
+  researchStatus: researchStatusFor(null),
 };
 
 function waitDecision(partial: Partial<Decision>): Decision {
@@ -126,14 +128,15 @@ function qualityDecision(
     decidedAt: args.now,
     userDecision: "WAIT",
     corroboration: args.corroboration ?? null,
-    lifecycle: "WATCH",
+    lifecycle: "OBSERVING",
   });
 }
 
 function userOf(kind: Decision["kind"], direction: Direction | null, watch: Candidate | null, best: Candidate | null): UserDecision {
   if (kind === "RELEASE" && direction === "long") return "BUY";
   if (kind === "RELEASE" && direction === "short") return "SELL";
-  if (watch || (best && (best.state === "WATCH" || best.state === "TRIGGERED" || best.state === "FORMING"))) return "WATCH";
+  const c = watch ?? best;
+  if (c && (c.state === "WATCH" || c.state === "TRIGGERED" || c.state === "FORMING" || c.state === "QUALIFIED")) return "WATCH";
   return "WAIT";
 }
 
@@ -313,15 +316,21 @@ export function decide(args: {
       evidenceGrade: extra.evidenceGrade ?? slots.best?.grade ?? null,
       waitCode: extra.waitCode,
       waitDetail: extra.waitDetail,
-      lifecycle: watch?.state ?? "WATCH",
-      trigger: watch?.trigger ?? slots.best?.trigger ?? null,
-      invalidation: watch?.invalidation ?? slots.best?.invalidation ?? null,
+      lifecycle: extra.lifecycle ?? watch?.state ?? "OBSERVING",
+      trigger: watch?.trigger ?? slots.best?.trigger ?? extra.trigger ?? null,
+      invalidation: watch?.invalidation ?? slots.best?.invalidation ?? extra.invalidation ?? null,
       userDecision: "WAIT",
       blockedByRisk: extra.blockedByRisk ?? false,
       whyNow: extra.whyNow ?? watch?.whyNow ?? slots.best?.whyNow ?? null,
       whyNot: extra.whyNot ?? extra.waitDetail ?? watch?.whyNot ?? slots.best?.whyNot ?? null,
     });
     d.userDecision = userOf("WAIT", d.direction, d.watch, d.best);
+    d.researchStatus = researchStatusFor(d.family);
+    if (extra.waitCode === "WAIT_QUARANTINE") {
+      d.userDecision = "WAIT";
+      d.researchStatus = researchStatusFor(extra.family ?? d.family);
+    }
+    if (d.lifecycle === "TRIGGERED" && d.userDecision === "WATCH") d.lifecycle = "QUALIFIED";
     return d;
   };
 
@@ -339,8 +348,18 @@ export function decide(args: {
     });
   }
 
-  const primary = pickPrimary(families) ?? slots.best;
+  const primary = pickPrimary(families) ?? (slots.best && isActionableFamily(slots.best.family) ? slots.best : null);
   if (!primary || !("family" in primary) || !primary.direction) {
+    const q = quarantinedEligible(families);
+    if (q) {
+      return finishWait({
+        waitCode: "WAIT_QUARANTINE",
+        waitDetail: researchStatusFor(q.family).note,
+        direction: q.direction,
+        family: q.family,
+        evidenceGrade: q.grade,
+      });
+    }
     return finishWait({
       waitCode: "WAIT_REGIME",
       waitDetail: `regime ${regime.kind}. ${regime.reasons[0] ?? "no family eligible on closed 15m"}`,
@@ -496,7 +515,6 @@ export function decide(args: {
     corroboration,
     thesis: null,
     thesisChange: null,
-    lifecycle: "RELEASED",
     trigger: cand?.trigger ?? "closed trigger held",
     invalidation: cand?.invalidation ?? null,
     blockedByRisk: false,
@@ -504,6 +522,8 @@ export function decide(args: {
     best: cand ? { ...cand, state: "RELEASED", geometry: geo } : slots.best,
     whyNow: cand?.whyNow || cand?.reasons[0] || "closed continuation trigger held",
     whyNot: null,
+    researchStatus: researchStatusFor("trend"),
+    lifecycle: "CANDIDATE",
   };
   return released;
 }

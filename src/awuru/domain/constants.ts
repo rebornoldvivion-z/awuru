@@ -1,7 +1,7 @@
 export const ENGINE_VERSION = "7.3.0";
 export const APP_NAME = "AWURU v7 — Discipline Desk";
 export const DB_NAME = "awuru-v7";
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 export const ASSETS = ["BTC", "ETH", "GOLD"] as const;
 export type Asset = (typeof ASSETS)[number];
@@ -85,6 +85,7 @@ export const WAIT_CODES = [
   "WAIT_GOAL",
   "WAIT_DIVERGENCE",
   "WAIT_TRIGGER",
+  "WAIT_QUARANTINE",
 ] as const;
 export type WaitCode = (typeof WAIT_CODES)[number];
 
@@ -95,11 +96,15 @@ export const USER_DECISIONS = ["BUY", "SELL", "WATCH", "WAIT"] as const;
 export type UserDecision = (typeof USER_DECISIONS)[number];
 
 export const LIFECYCLE_STATES = [
+  "OBSERVING",
   "FORMING",
   "WATCH",
   "TRIGGERED",
+  "QUALIFIED",
+  "CANDIDATE",
   "RELEASED",
   "CONFIRMED",
+  "DEGRADED",
   "EXPIRED",
   "INVALIDATED",
 ] as const;
