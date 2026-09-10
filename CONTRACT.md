@@ -2,7 +2,8 @@
 
 Frozen. Do not reopen provider research.
 
-Product: **AWURU v7 — Discipline Desk**
+Product: **AWURU v7 — Discipline Desk**  
+Engine: **7.1.0** (terminal intelligence). Historical 7.0.0 records stay frozen.
 
 Runtime: **Model B** — Vercel/Nitro UI host + dumb public market-data proxy. Browser-only intelligence. IndexedDB ledger.
 
@@ -12,74 +13,49 @@ Runtime: **Model B** — Vercel/Nitro UI host + dumb public market-data proxy. B
 2. FALLBACK `https://api.kraken.com/0/public` — OHLC + AssetPairs — XBTUSD ETHUSD
 3. BACKUP `https://www.okx.com/api/v5` — market/candles + public/instruments — BTC-USDT ETH-USDT
 
-Do not use `api.binance.com` as primary.
+Do not use `api.binance.com` as primary. Do not stitch venues. Do not average candles.
 
 ## Public API (data only)
 
 - `GET /api/health`
 - `GET /api/bundle?asset=BTC|ETH`
 
-Returns normalized tape, forming/closed split, one-venue bundle, filters, transport errors. Never WAIT/RELEASE.
-
-Browser consumes the bundle and runs `decide()`. If the proxy fails, the browser fetches venues itself.
+Returns normalized tape, forming/closed split, one-venue bundle, filters, **source corroboration metadata** (spread, timestamps, SOURCE_AGREEMENT / DIVERGENCE / PRIMARY_ONLY / INSUFFICIENT). Never BUY/SELL/WATCH/WAIT.
 
 ## ENGINE-VALID CANDLE
 
-`bar_open % interval == 0`
-AND `now_utc >= bar_open + interval`
-AND OHLC invariants
-AND if OKX: `confirm == "1"`
-
-Binance `closeTime` is a schedule, not a close.
-Kraken last row is forming.
-OKX `confirm == "0"` is forming.
+`bar_open % interval == 0` AND `now_utc >= bar_open + interval` AND OHLC invariants AND if OKX: `confirm == "1"`.
 
 ## MTF
 
-Native venue candles. One venue per `decide()`. Parent membership:
+Native venue candles. One venue per `decide()`. At 10:15 UTC last closed 4h = **04:00**.
 
-`parentOpen = floor(open / interval) * interval`
+HTF stance: SUPPORTIVE / NEUTRAL / OPPOSING. Opposition **downgrades to WATCH**; it does not delete the candidate. Unclosed HTF bars are never used.
 
-Usable HTF bar is the last **closed** parent, not the still-open parent of the child.
+## Quality / corroboration
 
-At 10:15 UTC:
+LIVE may RELEASE. DELAYED / STALE / PARTIAL / INVALID / UNAVAILABLE / SOURCE_SWITCH → WAIT. SOURCE_DIVERGENCE → WAIT_DIVERGENCE. Corroboration never votes a direction.
 
-- last closed 15m = 10:00
-- last closed 1h = 09:00
-- last closed 4h = **04:00** (08:00–12:00 is still open)
+## Lifecycle
 
-At 12:00 UTC last closed 4h = 08:00.
+FORMING → WATCH → TRIGGERED → RELEASED → CONFIRMED, or EXPIRED / INVALIDATED. WATCH is not a trade.
 
-A later brief that listed “4h → 08:00 closed at 10:15” is rejected as look-ahead. Membership of the 10:00 15m bar is the 08:00 4h parent; that parent is not engine-valid until 12:00.
+User card: **BUY / SELL / WATCH / WAIT**. BUY/SELL = manual RELEASE candidate.
 
-## Quality
+## Sizing / risk / goals
 
-LIVE may RELEASE. DELAYED / STALE / PARTIAL / INVALID / UNAVAILABLE / SOURCE_SWITCH → WAIT.
+Unchanged. Floor-to-step. NEVER round up. Goals never increase size. Valid setup blocked by risk stays visible as blocked.
 
-## Sizing
+## Session
 
-`qty = floor(risk_cash / |entry-stop| / step) * step`. Never round up to a minimum. Fail → WAIT_UNSIZEABLE.
+While Desk is **focused**, refresh at each 15m close. Hidden/closed tab is not monitoring. No cron. No 24/7.
 
-Binance: PRICE_FILTER, LOT_SIZE, **NOTIONAL.minNotional**.
-
-Spot. Leverage 1×. BTC and ETH only.
-
-## Fallback
-
-Whole 15m+1h+4h bundle switches. New series id. Never stitch venues. Mixed-venue MTF is INVALID.
-
-## WAIT
-
-Typed: WAIT_DATA, WAIT_HTF, WAIT_DISAGREEMENT, WAIT_RISK, WAIT_UNSIZEABLE, WAIT_SOURCE_TRANSITION, WAIT_REGIME, WAIT_GEOMETRY, WAIT_EVIDENCE, WAIT_GOAL.
+Thesis memory in IndexedDB. Compare UNCHANGED / STRENGTHENED / WEAKENED / INVALIDATED / REVERSED / NEW_SETUP.
 
 ## Product
 
-WAIT-first mentor. Manual Scan. Manual RELEASE confirmation. IndexedDB. Four surfaces: Desk, Plan, Journal, Academy.
+WAIT-first mentor. Manual confirmation. BTC + ETH. IndexedDB. Four surfaces.
 
 ## Host
 
-Public URL: this Grok app on Vercel (no extra account).
-
-Allowed: Vercel as file host + dumb `/api/*` data proxy.
-
-Forbidden: Vercel Functions as intelligence, cron, Cloudflare Workers, Neon for personal data, broker APIs, LLM in `decide()`.
+Vercel/Nitro only. Forbidden: Render, Supabase, Neon, Cloudflare Workers, cron, broker, LLM in `decide()`.

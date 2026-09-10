@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   DEFAULT_ACCOUNT_ID,
   ENGINE_VERSION,
+  INTERVAL_MS,
   type Asset,
   type Persona,
 } from "./constants.ts";
@@ -9,36 +10,51 @@ import { decide } from "./engine.ts";
 import { newId } from "./ids.ts";
 import {
   addEvent,
+  addLifecycle,
   available,
   getMissionBySignal,
   listEvents,
+  listLifecycle,
   listMissions,
   listShadows,
   listSignals,
   loadProfile,
   loadRiskDay,
+  loadThesis,
   putMission,
   putShadow,
   putSignal,
   saveProfile,
   saveRiskDay,
   saveShadow,
+  saveThesis,
 } from "./persist.ts";
 import { applyMissionClose, applyMissionOpen } from "./risk.ts";
 import { scoreMissionGeometry, scoreShadow } from "./shadow.ts";
 import { utcDayKey } from "./time.ts";
 import { loadTape, type DataSource } from "./client-api.ts";
+import { changeCopy, compareThesis, thesisFrom } from "./engine/thesis.ts";
 import type {
   Decision,
+  LifecycleEvent,
   Mission,
   MtfBundle,
   Profile,
   RiskDay,
   Shadow,
   StoredSignal,
+  Thesis,
 } from "./types.ts";
+import type { ThesisChange } from "./constants.ts";
 
 type EventRow = { id: string; at: number; type: string; detail: string };
+
+let focusTimer: ReturnType<typeof setTimeout> | null = null;
+
+function nextCloseMs(now: number): number {
+  const iv = INTERVAL_MS["15m"];
+  return Math.ceil((now + 50) / iv) * iv;
+}
 
 type Session = {
   ready: boolean;
@@ -56,12 +72,18 @@ type Session = {
   events: EventRow[];
   now: number;
   dataSource: DataSource | null;
+  thesis: Thesis | null;
+  thesisChange: ThesisChange | null;
+  changeNote: string | null;
+  nextCloseAt: number | null;
+  focused: boolean;
   hydrate: () => Promise<void>;
   setAsset: (a: Asset) => void;
-  scan: () => Promise<void>;
+  scan: (reason?: string) => Promise<void>;
   confirmRelease: () => Promise<void>;
   savePersona: (p: Persona) => Promise<void>;
   saveGoal: (equity: number, target: number | null, deadline: string | null) => Promise<void>;
+  setFocused: (on: boolean) => void;
 };
 
 export const useSession = create<Session>((set, get) => ({
@@ -80,6 +102,11 @@ export const useSession = create<Session>((set, get) => ({
   events: [],
   now: 0,
   dataSource: null,
+  thesis: null,
+  thesisChange: null,
+  changeNote: null,
+  nextCloseAt: null,
+  focused: true,
 
   hydrate: async () => {
     try {
@@ -94,9 +121,10 @@ export const useSession = create<Session>((set, get) => ({
         shadows: await listShadows(),
         signals: await listSignals(),
         events: await listEvents(),
+        thesis: await loadThesis(),
         ready: true,
       });
-      void get().scan();
+      void get().scan("open");
     } catch (err) {
       set({
         ready: true,
@@ -118,15 +146,35 @@ export const useSession = create<Session>((set, get) => ({
 
   setAsset: (asset) => {
     set({ asset });
-    void get().scan();
+    void get().scan("asset");
   },
 
-  scan: async () => {
+  setFocused: (on) => {
+    set({ focused: on });
+    if (focusTimer) {
+      clearTimeout(focusTimer);
+      focusTimer = null;
+    }
+    if (!on) return;
+    const fire = () => {
+      const { focused, scan } = get();
+      if (!focused) return;
+      const when = nextCloseMs(Date.now());
+      set({ nextCloseAt: when });
+      focusTimer = setTimeout(() => {
+        if (get().focused) void scan("15m-close");
+        fire();
+      }, Math.max(250, when - Date.now() + 400));
+    };
+    fire();
+  },
+
+  scan: async (reason = "manual") => {
     const { profile, riskDay, asset } = get();
     if (!profile || !riskDay) return;
     set({ scanning: true, error: null });
     const t = Date.now();
-    set({ now: t });
+    set({ now: t, nextCloseAt: nextCloseMs(t) });
     try {
       const loaded = await loadTape(asset, t);
       const d = decide({
@@ -135,7 +183,29 @@ export const useSession = create<Session>((set, get) => ({
         riskDay,
         now: loaded.now,
         accountId: DEFAULT_ACCOUNT_ID,
+        corroboration: loaded.corroboration,
       });
+      const prev = get().thesis ?? (await loadThesis());
+      const nextThesis = thesisFrom(d);
+      const change = compareThesis(prev, nextThesis);
+      nextThesis.id = "thesis";
+      d.thesis = nextThesis;
+      d.thesisChange = change;
+      await saveThesis(nextThesis);
+      if (change !== "UNCHANGED") {
+        await addEvent({ id: newId("evt"), at: t, type: "thesis", detail: `${changeCopy(change)} · ${reason}` });
+        const lc: LifecycleEvent = {
+          id: newId("life"),
+          at: t,
+          from: prev?.state ?? null,
+          to: d.lifecycle,
+          reason: d.waitDetail ?? d.userDecision,
+          engineVersion: ENGINE_VERSION,
+          asset,
+          barOpen: d.barOpen,
+        };
+        await addLifecycle(lc);
+      }
       if (loaded.errors.length) {
         await addEvent({ id: newId("evt"), at: t, type: "venue", detail: loaded.errors.join(" · ") });
       }
@@ -223,7 +293,11 @@ export const useSession = create<Session>((set, get) => ({
         riskDay: await loadRiskDay(utcDayKey(t)),
         dataSource: loaded.source,
         scanning: false,
+        thesis: nextThesis,
+        thesisChange: change,
+        changeNote: reason === "15m-close" ? `15m closed · ${changeCopy(change)}` : changeCopy(change),
       });
+      void listLifecycle();
     } catch (err) {
       set({ scanning: false, error: err instanceof Error ? err.message : "scan failed" });
     }
@@ -268,7 +342,17 @@ export const useSession = create<Session>((set, get) => ({
       id: newId("evt"),
       at: Date.now(),
       type: "confirm",
-      detail: `manual RELEASE ${m.symbol} ${m.direction}`,
+      detail: `manual ${decision.userDecision} ${m.symbol} ${m.direction}`,
+    });
+    await addLifecycle({
+      id: newId("life"),
+      at: Date.now(),
+      from: "RELEASED",
+      to: "CONFIRMED",
+      reason: "manual confirmation",
+      engineVersion: ENGINE_VERSION,
+      asset: decision.asset,
+      barOpen: decision.barOpen,
     });
     set({
       riskDay: next,

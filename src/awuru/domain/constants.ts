@@ -1,7 +1,7 @@
-export const ENGINE_VERSION = "7.0.0";
+export const ENGINE_VERSION = "7.1.0";
 export const APP_NAME = "AWURU v7 — Discipline Desk";
 export const DB_NAME = "awuru-v7";
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export const ASSETS = ["BTC", "ETH"] as const;
 export type Asset = (typeof ASSETS)[number];
@@ -81,11 +81,51 @@ export const WAIT_CODES = [
   "WAIT_GEOMETRY",
   "WAIT_EVIDENCE",
   "WAIT_GOAL",
+  "WAIT_DIVERGENCE",
+  "WAIT_TRIGGER",
 ] as const;
 export type WaitCode = (typeof WAIT_CODES)[number];
 
 export const DECISION_KINDS = ["WAIT", "RELEASE"] as const;
 export type DecisionKind = (typeof DECISION_KINDS)[number];
+
+export const USER_DECISIONS = ["BUY", "SELL", "WATCH", "WAIT"] as const;
+export type UserDecision = (typeof USER_DECISIONS)[number];
+
+export const LIFECYCLE_STATES = [
+  "FORMING",
+  "WATCH",
+  "TRIGGERED",
+  "RELEASED",
+  "CONFIRMED",
+  "EXPIRED",
+  "INVALIDATED",
+] as const;
+export type LifecycleState = (typeof LIFECYCLE_STATES)[number];
+
+export const REGIME_KINDS = ["TREND", "RANGE", "COMPRESSION", "EXPANSION"] as const;
+export type RegimeKind = (typeof REGIME_KINDS)[number];
+
+export const HTF_STANCES = ["SUPPORTIVE", "NEUTRAL", "OPPOSING"] as const;
+export type HtfStance = (typeof HTF_STANCES)[number];
+
+export const CORROBORATION_STATES = [
+  "SOURCE_AGREEMENT",
+  "SOURCE_DIVERGENCE",
+  "PRIMARY_ONLY",
+  "INSUFFICIENT",
+] as const;
+export type CorroborationState = (typeof CORROBORATION_STATES)[number];
+
+export const THESIS_CHANGES = [
+  "UNCHANGED",
+  "STRENGTHENED",
+  "WEAKENED",
+  "INVALIDATED",
+  "REVERSED",
+  "NEW_SETUP",
+] as const;
+export type ThesisChange = (typeof THESIS_CHANGES)[number];
 
 export const BINANCE_VISION = "https://data-api.binance.vision";
 export const KRAKEN_PUBLIC = "https://api.kraken.com/0/public";
@@ -169,3 +209,7 @@ export const PERSONA_POLICY: Record<
 export const DEFAULT_EQUITY = 10_000;
 export const DEFAULT_ACCOUNT_ID = "primary";
 export const LEVERAGE = 1;
+
+export const AGREE_SPREAD_PCT = 0.0015;
+export const DIVERGE_SPREAD_PCT = 0.005;
+export const AGREE_TS_MS = INTERVAL_MS["15m"];

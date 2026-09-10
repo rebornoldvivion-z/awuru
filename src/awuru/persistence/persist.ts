@@ -2,14 +2,16 @@ import { DB_NAME, DB_VERSION, DEFAULT_ACCOUNT_ID, DEFAULT_EQUITY } from "../doma
 import type {
   Account,
   AwuruEvent,
+  LifecycleEvent,
   Mission,
   Profile,
   RiskDay,
   Shadow,
   StoredSignal,
+  Thesis,
 } from "../domain/types.ts";
 
-const STORES = ["profile", "accounts", "signals", "missions", "shadows", "risk_days", "events"] as const;
+const STORES = ["profile", "accounts", "signals", "missions", "shadows", "risk_days", "events", "thesis", "lifecycle"] as const;
 type StoreName = (typeof STORES)[number];
 
 function defaultProfile(): Profile {
@@ -36,7 +38,14 @@ function openDb(): Promise<IDBDatabase> {
       const db = req.result;
       for (const name of STORES) {
         if (!db.objectStoreNames.contains(name)) {
-          const key = name === "profile" ? "id" : name === "signals" ? "signalId" : name === "risk_days" ? "day" : "id";
+          const key =
+            name === "profile" || name === "thesis"
+              ? "id"
+              : name === "signals"
+                ? "signalId"
+                : name === "risk_days"
+                  ? "day"
+                  : "id";
           db.createObjectStore(name, { keyPath: key });
         }
       }
@@ -166,6 +175,23 @@ export async function addEvent(e: AwuruEvent): Promise<void> {
 
 export async function listEvents(): Promise<AwuruEvent[]> {
   const all = await getAll<AwuruEvent>("events");
+  return all.sort((a, b) => b.at - a.at);
+}
+
+export async function loadThesis(): Promise<Thesis | null> {
+  return (await get<Thesis>("thesis", "thesis")) ?? null;
+}
+
+export async function saveThesis(t: Thesis): Promise<void> {
+  await put("thesis", t);
+}
+
+export async function addLifecycle(e: LifecycleEvent): Promise<void> {
+  await put("lifecycle", e);
+}
+
+export async function listLifecycle(): Promise<LifecycleEvent[]> {
+  const all = await getAll<LifecycleEvent>("lifecycle");
   return all.sort((a, b) => b.at - a.at);
 }
 

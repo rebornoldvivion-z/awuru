@@ -7,21 +7,72 @@ import {
   TIMEFRAMES,
   type Asset,
   type Persona,
+  type UserDecision,
 } from "../domain/constants.ts";
-import type { Decision, MtfBundle, Profile, Quality, RiskDay } from "../domain/types.ts";
+import type {
+  Candidate,
+  Corroboration,
+  Decision,
+  Direction,
+  Geometry,
+  MtfBundle,
+  Profile,
+  Quality,
+  RiskDay,
+} from "../domain/types.ts";
 import { lastClosed } from "../market/candles.ts";
-import { evaluateFamilies, disagreement, htfBiasFrom, pickPrimary } from "./families.ts";
+import { disagreement, evaluateFamilies, htfBiasFrom, pickPrimary } from "./families.ts";
 import { geometryFromBars } from "./geometry.ts";
 import { signalId } from "./ids.ts";
-import { snapshot } from "./indicators.ts";
+import { snapshot, priorDonchian } from "./indicators.ts";
 import { assessSeries, combineQuality, releaseAllowed, waitCodeForQuality } from "../market/quality.ts";
 import { checkRisk, goalConstraint } from "../risk/risk.ts";
 import { sizePosition } from "../risk/sizing.ts";
+import { readStructure } from "./structure.ts";
+import { classifyRegime } from "./regime.ts";
+import { buildCandidates, pickSlots } from "./candidates.ts";
 
-function waitDecision(
-  partial: Omit<Decision, "kind" | "engineVersion"> & { kind?: Decision["kind"] },
-): Decision {
+const intel = {
+  userDecision: "WAIT" as UserDecision,
+  candidates: [] as Candidate[],
+  best: null as Candidate | null,
+  secondary: null as Candidate | null,
+  watch: null as Candidate | null,
+  regime: null as Decision["regime"],
+  structure: null as Decision["structure"],
+  htfStance: { h1: "NEUTRAL" as const, h4: "NEUTRAL" as const },
+  corroboration: null as Corroboration | null,
+  thesis: null as Decision["thesis"],
+  thesisChange: null as Decision["thesisChange"],
+  lifecycle: "WATCH" as Decision["lifecycle"],
+  trigger: null as string | null,
+  invalidation: null as string | null,
+  blockedByRisk: false,
+};
+
+function waitDecision(partial: Partial<Decision>): Decision {
   return {
+    waitCode: null,
+    waitDetail: null,
+    signalId: null,
+    accountId: DEFAULT_ACCOUNT_ID,
+    asset: "BTC",
+    venue: null,
+    symbol: null,
+    quote: null,
+    timeframe: PRIMARY_TF,
+    barOpen: null,
+    direction: null,
+    family: null,
+    families: [],
+    geometry: null,
+    size: null,
+    persona: "Orion",
+    quality: { state: "UNAVAILABLE", venue: null, reason: "", lastClosedOpen: null, ageMs: null, now: 0 },
+    htf: emptyHtf(),
+    evidenceGrade: null,
+    decidedAt: 0,
+    ...intel,
     ...partial,
     kind: "WAIT",
     engineVersion: ENGINE_VERSION,
@@ -34,7 +85,7 @@ function emptyHtf() {
 
 function qualityDecision(
   quality: Quality,
-  args: { asset: Asset; persona: Persona; accountId: string; now: number },
+  args: { asset: Asset; persona: Persona; accountId: string; now: number; corroboration?: Corroboration | null },
 ): Decision {
   const code = waitCodeForQuality(quality.state);
   return waitDecision({
@@ -59,7 +110,17 @@ function qualityDecision(
     htf: emptyHtf(),
     evidenceGrade: null,
     decidedAt: args.now,
+    userDecision: "WAIT",
+    corroboration: args.corroboration ?? null,
+    lifecycle: "WATCH",
   });
+}
+
+function userOf(kind: Decision["kind"], direction: Direction | null, watch: Candidate | null, best: Candidate | null): UserDecision {
+  if (kind === "RELEASE" && direction === "long") return "BUY";
+  if (kind === "RELEASE" && direction === "short") return "SELL";
+  if (watch || (best && (best.state === "WATCH" || best.state === "TRIGGERED" || best.state === "FORMING"))) return "WATCH";
+  return "WAIT";
 }
 
 export function decide(args: {
@@ -69,10 +130,12 @@ export function decide(args: {
   riskDay: RiskDay;
   now: number;
   accountId?: string;
+  corroboration?: Corroboration | null;
 }): Decision {
   const accountId = args.accountId ?? DEFAULT_ACCOUNT_ID;
   const persona = args.profile.persona;
   const now = args.now;
+  const corroboration = args.corroboration ?? null;
 
   if (!args.bundle) {
     const quality: Quality = args.qualityOverride ?? {
@@ -83,7 +146,7 @@ export function decide(args: {
       ageMs: null,
       now,
     };
-    return qualityDecision(quality, { asset: "BTC", persona, accountId, now });
+    return qualityDecision(quality, { asset: "BTC", persona, accountId, now, corroboration });
   }
 
   const bundle = args.bundle;
@@ -99,7 +162,7 @@ export function decide(args: {
           ageMs: null,
           now,
         },
-        { asset: bundle.asset, persona, accountId, now },
+        { asset: bundle.asset, persona, accountId, now, corroboration },
       );
     }
   }
@@ -120,10 +183,11 @@ export function decide(args: {
     persona,
     quality,
     decidedAt: now,
+    corroboration,
   };
 
   if (!releaseAllowed(quality.state)) {
-    return qualityDecision(quality, { asset: bundle.asset, persona, accountId, now });
+    return qualityDecision(quality, { asset: bundle.asset, persona, accountId, now, corroboration });
   }
 
   const s15 = bundle.series["15m"];
@@ -135,7 +199,7 @@ export function decide(args: {
   if (!last15 || !last1h || !last4h) {
     return qualityDecision(
       { ...quality, state: "PARTIAL", reason: "missing last closed MTF bar" },
-      { asset: bundle.asset, persona, accountId, now },
+      { asset: bundle.asset, persona, accountId, now, corroboration },
     );
   }
 
@@ -156,9 +220,13 @@ export function decide(args: {
       size: null,
       htf: emptyHtf(),
       evidenceGrade: null,
+      userDecision: "WAIT",
     });
   }
 
+  const prior = priorDonchian(s15.candles);
+  const structure = readStructure(s15.candles, prior);
+  const regime = classifyRegime(last15, ind15, s15.candles, structure);
   const h1Bias = htfBiasFrom(ind1h, last1h);
   const h4Bias = htfBiasFrom(ind4h, last4h);
   const htf = {
@@ -168,74 +236,111 @@ export function decide(args: {
     h4ClosedOpen: last4h.openTime,
   };
 
-  const families = evaluateFamilies(s15.candles, last15, ind15, h1Bias, h4Bias);
+  const families = evaluateFamilies(s15.candles, last15, ind15, h1Bias, h4Bias, structure, regime);
+  const geoFn = (direction: Direction): Geometry | null => {
+    const g = geometryFromBars({
+      direction,
+      candles: s15.candles,
+      last: last15,
+      ind: ind15,
+      filters: bundle.filters,
+      timeframe: PRIMARY_TF,
+    });
+    return "error" in g ? null : g;
+  };
+  const candidates = buildCandidates(families, h1Bias, h4Bias, regime, geoFn);
+  const slots = pickSlots(candidates);
+  const intelPack = {
+    candidates,
+    best: slots.best,
+    secondary: slots.secondary,
+    watch: slots.watch,
+    regime,
+    structure,
+    htfStance: {
+      h1: slots.best ? slots.best.h1 : ("NEUTRAL" as const),
+      h4: slots.best ? slots.best.h4 : ("NEUTRAL" as const),
+    },
+  };
 
-  if (disagreement(families)) {
-    return waitDecision({
+  const finishWait = (extra: Partial<Decision> & { waitCode: Decision["waitCode"]; waitDetail: string }): Decision => {
+    const direction = extra.direction ?? slots.best?.direction ?? null;
+    const watch = slots.watch ?? (slots.best && slots.best.state !== "RELEASED" ? slots.best : null);
+    const d = waitDecision({
       ...base,
-      waitCode: "WAIT_DISAGREEMENT",
-      waitDetail: "families eligible in opposite directions",
+      ...intelPack,
       signalId: null,
       barOpen: last15.openTime,
-      direction: null,
-      family: null,
+      direction,
+      family: extra.family ?? slots.best?.family ?? null,
       families,
-      geometry: null,
-      size: null,
+      geometry: extra.geometry ?? slots.best?.geometry ?? null,
+      size: extra.size ?? null,
       htf,
-      evidenceGrade: null,
+      evidenceGrade: extra.evidenceGrade ?? slots.best?.grade ?? null,
+      waitCode: extra.waitCode,
+      waitDetail: extra.waitDetail,
+      lifecycle: watch?.state ?? "WATCH",
+      trigger: watch?.trigger ?? slots.best?.trigger ?? null,
+      invalidation: watch?.invalidation ?? slots.best?.invalidation ?? null,
+      userDecision: "WAIT",
+      blockedByRisk: extra.blockedByRisk ?? false,
+    });
+    d.userDecision = userOf("WAIT", d.direction, d.watch, d.best);
+    return d;
+  };
+
+  if (corroboration?.status === "SOURCE_DIVERGENCE") {
+    return finishWait({
+      waitCode: "WAIT_DIVERGENCE",
+      waitDetail: corroboration.reason,
     });
   }
 
-  const primary = pickPrimary(families);
-  if (!primary || !primary.direction) {
-    return waitDecision({
-      ...base,
+  if (disagreement(families)) {
+    return finishWait({
+      waitCode: "WAIT_DISAGREEMENT",
+      waitDetail: "families eligible in opposite directions — both kept as candidates, none released",
+    });
+  }
+
+  const primary = pickPrimary(families) ?? slots.best;
+  if (!primary || !("family" in primary) || !primary.direction) {
+    return finishWait({
       waitCode: "WAIT_REGIME",
-      waitDetail: "no family is eligible on closed 15m",
-      signalId: null,
-      barOpen: last15.openTime,
-      direction: null,
-      family: null,
-      families,
-      geometry: null,
-      size: null,
-      htf,
-      evidenceGrade: null,
+      waitDetail: `regime ${regime.kind}. ${regime.reasons[0] ?? "no family eligible on closed 15m"}`,
     });
   }
 
   const dir = primary.direction;
-  if (h4Bias !== "neutral" && h4Bias !== dir) {
-    return waitDecision({
-      ...base,
+  const cand = candidates.find((c) => c.family === primary.family && c.direction === dir) ?? slots.best;
+
+  if (cand && cand.h4 === "OPPOSING") {
+    return finishWait({
       waitCode: "WAIT_HTF",
-      waitDetail: `4h bias ${h4Bias} opposes ${dir} (4h closed ${new Date(last4h.openTime).toISOString()})`,
-      signalId: null,
-      barOpen: last15.openTime,
+      waitDetail: `4h ${h4Bias} opposes ${dir}. Candidate kept as WATCH. Invalid if: ${cand.invalidation}`,
       direction: dir,
-      family: primary.family,
-      families,
-      geometry: null,
-      size: null,
-      htf,
-      evidenceGrade: primary.grade,
+      family: cand.family,
+      evidenceGrade: cand.grade,
     });
   }
-  if (h1Bias !== "neutral" && h1Bias !== dir) {
-    return waitDecision({
-      ...base,
+  if (cand && cand.h1 === "OPPOSING") {
+    return finishWait({
       waitCode: "WAIT_HTF",
-      waitDetail: `1h bias ${h1Bias} opposes ${dir} (1h closed ${new Date(last1h.openTime).toISOString()})`,
-      signalId: null,
-      barOpen: last15.openTime,
+      waitDetail: `1h ${h1Bias} opposes ${dir}. Waiting for 1h alignment. Invalid if: ${cand.invalidation}`,
       direction: dir,
-      family: primary.family,
-      families,
-      geometry: null,
-      size: null,
-      htf,
-      evidenceGrade: primary.grade,
+      family: cand.family,
+      evidenceGrade: cand.grade,
+    });
+  }
+
+  if (cand && cand.state !== "TRIGGERED") {
+    return finishWait({
+      waitCode: "WAIT_TRIGGER",
+      waitDetail: `${cand.family} ${dir} is ${cand.state}. Trigger: ${cand.trigger}. ${cand.blockers[0] ?? ""}`.trim(),
+      direction: dir,
+      family: cand.family,
+      evidenceGrade: cand.grade,
     });
   }
 
@@ -248,18 +353,11 @@ export function decide(args: {
     timeframe: PRIMARY_TF,
   });
   if ("error" in geo) {
-    return waitDecision({
-      ...base,
+    return finishWait({
       waitCode: "WAIT_GEOMETRY",
       waitDetail: geo.error,
-      signalId: null,
-      barOpen: last15.openTime,
       direction: dir,
       family: primary.family,
-      families,
-      geometry: null,
-      size: null,
-      htf,
       evidenceGrade: primary.grade,
     });
   }
@@ -274,18 +372,12 @@ export function decide(args: {
     riskPct: policy.riskPct,
   });
   if (goal.wait) {
-    return waitDecision({
-      ...base,
+    return finishWait({
       waitCode: goal.wait.code,
       waitDetail: goal.wait.detail,
-      signalId: null,
-      barOpen: last15.openTime,
       direction: dir,
       family: primary.family,
-      families,
       geometry: geo,
-      size: null,
-      htf,
       evidenceGrade: primary.grade,
     });
   }
@@ -297,19 +389,14 @@ export function decide(args: {
     requiredR: 1,
   });
   if (!risk.ok) {
-    return waitDecision({
-      ...base,
+    return finishWait({
       waitCode: risk.code,
-      waitDetail: risk.detail,
-      signalId: null,
-      barOpen: last15.openTime,
+      waitDetail: `VALID SETUP — BLOCKED BY RISK. ${risk.detail}`,
       direction: dir,
       family: primary.family,
-      families,
       geometry: geo,
-      size: null,
-      htf,
       evidenceGrade: primary.grade,
+      blockedByRisk: true,
     });
   }
 
@@ -321,18 +408,13 @@ export function decide(args: {
     filters: bundle.filters,
   });
   if (!size.ok) {
-    return waitDecision({
-      ...base,
+    return finishWait({
       waitCode: size.reason,
-      waitDetail: size.detail,
-      signalId: null,
-      barOpen: last15.openTime,
+      waitDetail: `VALID SETUP — BLOCKED BY SIZE. ${size.detail}`,
       direction: dir,
       family: primary.family,
-      families,
       geometry: geo,
       size,
-      htf,
       evidenceGrade: primary.grade,
     });
   }
@@ -347,7 +429,7 @@ export function decide(args: {
     persona,
   });
 
-  return {
+  const released: Decision = {
     kind: "RELEASE",
     waitCode: null,
     waitDetail: null,
@@ -370,7 +452,16 @@ export function decide(args: {
     evidenceGrade: primary.grade,
     engineVersion: ENGINE_VERSION,
     decidedAt: now,
+    ...intelPack,
+    corroboration,
+    thesis: null,
+    thesisChange: null,
+    lifecycle: "RELEASED",
+    trigger: cand?.trigger ?? "closed trigger held",
+    invalidation: cand?.invalidation ?? null,
+    blockedByRisk: false,
+    userDecision: dir === "long" ? "BUY" : "SELL",
+    best: cand ? { ...cand, state: "RELEASED", geometry: geo } : slots.best,
   };
+  return released;
 }
-
-

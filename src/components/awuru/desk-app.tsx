@@ -8,6 +8,7 @@ import { formatClock, formatUtc } from "@/awuru/time.ts";
 import type { Candle, Decision, Mission, MtfBundle, Profile, RiskDay, Shadow, StoredSignal } from "@/awuru/types.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { CandleChart } from "@/components/awuru/chart.tsx";
+import { ThesisCard } from "@/components/awuru/thesis-card.tsx";
 import { cn } from "@/lib/utils.ts";
 
 type Surface = "desk" | "plan" | "journal" | "academy";
@@ -15,6 +16,13 @@ type Surface = "desk" | "plan" | "journal" | "academy";
 function qualityTone(state: string) {
   if (state === "LIVE") return "text-up border-up/40 bg-up/10";
   if (state === "UNAVAILABLE" || state === "INVALID") return "text-danger border-danger/40 bg-danger/10";
+  return "text-wait border-wait/40 bg-wait/10";
+}
+
+function decisionTone(d: string) {
+  if (d === "BUY") return "text-up border-up/40 bg-up/10";
+  if (d === "SELL") return "text-danger border-danger/40 bg-danger/10";
+  if (d === "WATCH") return "text-steel border-steel/40 bg-steel/10";
   return "text-wait border-wait/40 bg-wait/10";
 }
 
@@ -41,10 +49,23 @@ export function DeskApp({ surface }: { surface: Surface }) {
   const savePersona = useSession((s) => s.savePersona);
   const saveGoal = useSession((s) => s.saveGoal);
   const confirmRelease = useSession((s) => s.confirmRelease);
+  const setFocused = useSession((s) => s.setFocused);
+  const changeNote = useSession((s) => s.changeNote);
+  const nextCloseAt = useSession((s) => s.nextCloseAt);
 
   useEffect(() => {
     if (!ready) void hydrate();
   }, [ready, hydrate]);
+
+  useEffect(() => {
+    const onVis = () => setFocused(document.visibilityState === "visible");
+    onVis();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      setFocused(false);
+    };
+  }, [setFocused]);
 
   const series = bundle?.series["15m"];
   const last = series?.candles[series.candles.length - 1] ?? null;
@@ -70,12 +91,10 @@ export function DeskApp({ surface }: { surface: Surface }) {
             <h1 className="text-lg font-medium tracking-tight md:text-xl">AWURU v7</h1>
           </div>
           <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                "rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider",
-                qualityTone(decision?.quality.state ?? "UNAVAILABLE"),
-              )}
-            >
+            <span className={cn("rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider", decisionTone(decision?.userDecision ?? "WAIT"))}>
+              {decision?.userDecision ?? "—"}
+            </span>
+            <span className={cn("rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider", qualityTone(decision?.quality.state ?? "UNAVAILABLE"))}>
               {decision?.quality.state ?? "—"}
             </span>
             <span className="hidden font-mono text-[10px] text-subtle sm:inline">{ENGINE_VERSION}</span>
@@ -108,7 +127,7 @@ export function DeskApp({ surface }: { surface: Surface }) {
             asset={asset}
             setAsset={setAsset}
             scanning={scanning || !ready}
-            onScan={() => void scan()}
+            onScan={() => void scan("manual")}
             decision={decision}
             bundle={bundle}
             last={last}
@@ -121,6 +140,9 @@ export function DeskApp({ surface }: { surface: Surface }) {
             activeMission={activeMission}
             storageOk={storageOk}
             dataSource={dataSource}
+            changeNote={changeNote}
+            nextCloseAt={nextCloseAt}
+            shadows={shadows}
           />
         )}
         {surface === "plan" && (
@@ -174,6 +196,24 @@ function NavLink({
   );
 }
 
+function Panel({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="rounded-xl border border-border bg-raised px-4 py-3">
+      <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-subtle">{title}</p>
+      {children}
+    </section>
+  );
+}
+
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between gap-3 py-0.5 text-sm">
+      <span className="text-subtle">{k}</span>
+      <span className="font-mono text-right text-fg">{v}</span>
+    </div>
+  );
+}
+
 function DeskSurface(props: {
   asset: Asset;
   setAsset: (a: Asset) => void;
@@ -191,10 +231,13 @@ function DeskSurface(props: {
   activeMission: Mission | undefined;
   storageOk: boolean;
   dataSource: "server" | "client" | null;
+  changeNote: string | null;
+  nextCloseAt: number | null;
+  shadows: Shadow[];
 }) {
   const d = props.decision;
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+    <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
       <section className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           {ASSETS.map((a) => (
@@ -203,10 +246,11 @@ function DeskSurface(props: {
             </Button>
           ))}
           <Button size="sm" variant="steel" onClick={props.onScan} disabled={props.scanning}>
-            {props.scanning ? "Scanning…" : "Scan closed bars"}
+            {props.scanning ? "Updating…" : "Scan closed bars"}
           </Button>
           <p className="font-mono text-xs text-muted">
             {props.bundle ? `${props.bundle.venue} · ${props.bundle.symbol}` : "no venue"}
+            {props.nextCloseAt ? ` · next close ${formatClock(props.nextCloseAt)}` : ""}
           </p>
         </div>
         {!props.storageOk && (
@@ -219,22 +263,8 @@ function DeskSurface(props: {
         )}
         <CandleChart candles={props.candles} live={props.live} geometry={d?.geometry ?? null} />
         <p className="text-xs text-subtle">
-          Charting by TradingView Lightweight Charts (Apache-2.0). Live wick is never engine input.
+          Charting by TradingView Lightweight Charts (Apache-2.0). Live wick is never engine input. While this tab is focused, analysis refreshes at each 15m close. Closed is not monitored.
         </p>
-      </section>
-      <aside className="space-y-3">
-        <Panel title="Market">
-          <Row k="Feed" v={props.bundle ? `${props.bundle.venue} · ${props.bundle.symbol}` : "—"} />
-          <Row k="Backend" v={props.dataSource === "server" ? "LIVE proxy" : props.dataSource === "client" ? "browser fallback" : "—"} />
-          <Row k="Quality" v={d?.quality.state ?? "—"} />
-          <Row k="Venue" v={d?.venue ?? "—"} />
-          <Row k="Last closed 15m" v={props.last ? formatUtc(props.last.openTime) : "—"} />
-          <Row k="Closed close" v={props.last ? props.last.close.toLocaleString() : "—"} />
-          <Row k="Clock" v={props.now ? formatUtc(props.now) : "—"} />
-          <Row k="1h parent" v={d?.htf.h1ClosedOpen ? formatClock(d.htf.h1ClosedOpen) : "—"} />
-          <Row k="4h parent" v={d?.htf.h4ClosedOpen ? formatClock(d.htf.h4ClosedOpen) : "—"} />
-          <Row k="HTF" v={`${d?.htf.h1Bias ?? "—"} / ${d?.htf.h4Bias ?? "—"}`} />
-        </Panel>
         <Panel title="Families">
           {(d?.families.length ? d.families : []).map((f) => (
             <div key={f.family} className="border-t border-border py-2 first:border-0">
@@ -247,25 +277,32 @@ function DeskSurface(props: {
               <p className="mt-1 text-xs text-muted">{f.reasons[0]}</p>
             </div>
           ))}
-          {!d?.families.length && <p className="text-sm text-muted">Scan to evaluate closed bars.</p>}
+          {!d?.families.length && <p className="text-sm text-muted">Analysis fills after the first closed-bar load.</p>}
         </Panel>
-        <Panel title="Decision">
-          <p className="font-mono text-sm uppercase tracking-wider">
-            {d?.kind === "RELEASE" ? "RELEASE candidate" : (d?.waitCode ?? "WAIT")}
-          </p>
-          <p className="mt-2 text-sm text-muted">{d?.waitDetail ?? d?.quality.reason ?? "No scan yet."}</p>
-          <p className="mt-3 text-xs text-subtle">
-            Persona {props.persona} · UTC day {props.riskDay.day}
-          </p>
-          <p className="font-mono text-xs text-muted">
-            R {props.riskDay.realizedR} · open {props.riskDay.openR} · trades {props.riskDay.trades}
-          </p>
+      </section>
+      <aside className="space-y-3">
+        <Panel title="Market">
+          <Row k="Feed" v={props.bundle ? `${props.bundle.venue} · ${props.bundle.symbol}` : "—"} />
+          <Row k="Backend" v={props.dataSource === "server" ? "LIVE proxy" : props.dataSource === "client" ? "browser fallback" : "—"} />
+          <Row k="Corroboration" v={d?.corroboration?.status ?? "—"} />
+          <Row k="Spread" v={d?.corroboration?.spreadPct != null ? `${(d.corroboration.spreadPct * 100).toFixed(2)}%` : "—"} />
+          <Row k="Quality" v={d?.quality.state ?? "—"} />
+          <Row k="Last closed 15m" v={props.last ? formatUtc(props.last.openTime) : "—"} />
+          <Row k="Closed close" v={props.last ? props.last.close.toLocaleString() : "—"} />
+          <Row k="HTF" v={`${d?.htf.h1Bias ?? "—"} / ${d?.htf.h4Bias ?? "—"}`} />
           {props.activeMission && (
             <p className="mt-2 text-sm text-steel">
               Open mission {props.activeMission.symbol} {props.activeMission.direction}
             </p>
           )}
         </Panel>
+        <ThesisCard
+          decision={d}
+          changeNote={props.changeNote}
+          shadows={props.shadows}
+          persona={props.persona}
+          riskDay={props.riskDay}
+        />
       </aside>
     </div>
   );
@@ -320,7 +357,7 @@ function PlanSurface(props: {
         {d?.kind === "RELEASE" && d.geometry && d.size && d.size.ok ? (
           <div className="space-y-2">
             <p className="font-mono text-sm uppercase">
-              {d.direction} {d.symbol} · {d.family} · {d.evidenceGrade}
+              {d.userDecision} {d.symbol} · {d.family} · {d.evidenceGrade}
             </p>
             <Row k="Venue" v={d.venue ?? ""} />
             <Row k="Entry" v={String(d.geometry.entry)} />
@@ -331,13 +368,14 @@ function PlanSurface(props: {
             <Row k="Quality" v={d.quality.state} />
             <p className="pt-2 text-sm text-muted">This is a candidate. AWURU does not place orders. Confirming records a personal mission on this device.</p>
             <Button className="mt-2" onClick={props.onConfirm} disabled={already}>
-              {already ? "Already confirmed" : "Confirm mission"}
+              {already ? "Already confirmed" : `Confirm ${d.userDecision}`}
             </Button>
           </div>
         ) : (
           <div>
-            <p className="font-mono text-sm uppercase">{d?.waitCode ?? "WAIT"}</p>
-            <p className="mt-2 text-sm text-muted">{d?.waitDetail ?? "Scan the desk first. RELEASE is only offered on LIVE closed bars that pass every gate."}</p>
+            <p className="font-mono text-sm uppercase">{d?.userDecision ?? "WAIT"} · {d?.waitCode ?? ""}</p>
+            <p className="mt-2 text-sm text-muted">{d?.waitDetail ?? "Scan the desk first. BUY/SELL is only offered on LIVE closed bars that pass every gate."}</p>
+            {d?.watch && <p className="mt-2 text-sm text-steel">Watching {d.watch.family} {d.watch.direction}. Trigger: {d.watch.trigger}</p>}
           </div>
         )}
       </Panel>
@@ -369,7 +407,7 @@ function JournalSurface(props: {
               {m.symbol} {m.direction} · {m.status}
             </p>
             <p className="text-xs text-muted">
-              {m.venue} · R {m.realizedR ?? "open"} · {ENGINE_VERSION}
+              {m.venue} · R {m.realizedR ?? "open"} · {m.engineVersion}
             </p>
           </div>
         ))}
@@ -383,7 +421,7 @@ function JournalSurface(props: {
               {s.symbol} {s.direction} · {s.status}
             </p>
             <p className="text-xs text-muted">
-              {s.waitCode} · {s.family} · {s.venue}
+              {s.waitCode} · {s.family} · {s.venue} · {s.engineVersion}
             </p>
           </div>
         ))}
@@ -414,13 +452,12 @@ function JournalSurface(props: {
 
 function AcademySurface() {
   const items = [
-    { t: "WAIT is the product", b: "A blocked setup is a complete answer. Typed reasons name the actual gate." },
-    { t: "Closed candles only", b: "The engine uses a bar only when now is at or after bar open plus the interval. Binance closeTime is a schedule, not a close. Kraken’s last row is live. OKX confirm=0 is live. The forming wick on the chart is display-only." },
-    { t: "Native MTF, one venue", b: "15m, 1h and 4h come from a single venue. At 10:15 UTC the last closed 15m is 10:00, last closed 1h is 09:00, last closed 4h is 04:00 because the 08:00–12:00 four-hour bar is still open. A child close never closes the parent." },
-    { t: "No fabricated tape", b: "Missing bars are not filled. Delayed is not LIVE. PAXG is not gold. Fallback never stitches Binance history onto Kraken. If truth cannot be established, WAIT." },
-    { t: "Risk and goals", b: "Risk percent is set by the stored persona. Goals may tighten evidence or cut size near a deadline. They never increase size." },
-    { t: "Public backend", b: "The live host fetches Binance Vision, then Kraken, then OKX on the server and exposes /api/health plus /api/bundle. The engine still decides in this session. Personal ledger stays in IndexedDB. No API keys, no broker, no cron." },
-    { t: "What this is not", b: "Not a broker. Not 24/7 monitoring. Not a profit guarantee. Not an LLM decider. SOL, XAU and OIL are not in v7. State lives in this browser’s IndexedDB." },
+    { t: "WAIT is the product", b: "A blocked setup is a complete answer. Typed reasons name the actual gate. WATCH is not a trade." },
+    { t: "Closed candles only", b: "The engine uses a bar only when now is at or after bar open plus the interval. Binance closeTime is a schedule, not a close. The forming wick on the chart is display-only." },
+    { t: "Native MTF, one venue", b: "15m, 1h and 4h come from a single venue. At 10:15 UTC the last closed 4h is 04:00. HTF opposition downgrades a candidate to WATCH instead of deleting it." },
+    { t: "Corroboration is not a vote", b: "Binance, Kraken and OKX are compared for spread and timestamps. They never vote BUY. Divergence is WAIT. Histories are never stitched." },
+    { t: "Session, not a daemon", b: "While Desk is focused, analysis refreshes at each 15m close. When the tab is hidden or closed, AWURU is not watching the market." },
+    { t: "What this is not", b: "Not a broker. Not 24/7 monitoring. Not a profit guarantee. Not an LLM decider. SOL, XAU and OIL are not in v7." },
   ];
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -432,24 +469,6 @@ function AcademySurface() {
       <p className="flex items-center gap-2 text-xs text-subtle">
         <Shield className="size-3.5" /> Public market data. No API keys. Engine {ENGINE_VERSION}.
       </p>
-    </div>
-  );
-}
-
-function Panel({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="rounded-xl border border-border bg-surface p-4 md:p-5">
-      <h2 className="mb-3 text-sm font-medium tracking-tight">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function Row({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 py-0.5">
-      <span className="text-xs uppercase tracking-wider text-subtle">{k}</span>
-      <span className="font-mono text-xs tabular-nums text-fg">{v}</span>
     </div>
   );
 }

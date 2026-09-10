@@ -1,6 +1,7 @@
 import type { Asset, Venue } from "../domain/constants.ts";
-import type { MtfBundle } from "../domain/types.ts";
+import type { Corroboration, MtfBundle } from "../domain/types.ts";
 import { loadMtfBundle } from "./venues.ts";
+import { loadSourceSnaps, measureCorroboration } from "./corroboration.ts";
 
 export type DataSource = "server" | "client";
 
@@ -10,6 +11,7 @@ export type LoadedTape = {
   errors: string[];
   source: DataSource;
   now: number;
+  corroboration: Corroboration | null;
 };
 
 export async function loadTape(asset: Asset, now: number): Promise<LoadedTape> {
@@ -25,6 +27,7 @@ export async function loadTape(asset: Asset, now: number): Promise<LoadedTape> {
       failed?: Venue[];
       errors?: string[];
       error?: string;
+      corroboration?: Corroboration | null;
     };
     if (!data.ok) throw new Error(data.error ?? "backend returned no tape");
     return {
@@ -33,9 +36,10 @@ export async function loadTape(asset: Asset, now: number): Promise<LoadedTape> {
       errors: data.errors ?? [],
       source: "server",
       now: typeof data.now === "number" ? data.now : now,
+      corroboration: data.corroboration ?? null,
     };
   } catch (err) {
-    const loaded = await loadMtfBundle(asset, now);
+    const [loaded, snaps] = await Promise.all([loadMtfBundle(asset, now), loadSourceSnaps(asset, now)]);
     const msg = err instanceof Error ? err.message : "backend unreachable";
     return {
       bundle: loaded.bundle,
@@ -43,6 +47,7 @@ export async function loadTape(asset: Asset, now: number): Promise<LoadedTape> {
       errors: [`server: ${msg}`, ...loaded.errors],
       source: "client",
       now,
+      corroboration: measureCorroboration(snaps, loaded.bundle?.venue ?? null),
     };
   }
 }

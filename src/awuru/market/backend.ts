@@ -16,7 +16,8 @@ import {
   parseOkxCandles,
   VENUE_ORDER,
 } from "./venues.ts";
-import type { MtfBundle } from "../domain/types.ts";
+import type { Corroboration, MtfBundle } from "../domain/types.ts";
+import { loadSourceSnaps, measureCorroboration } from "./corroboration.ts";
 
 export type VenuePing = {
   venue: Venue;
@@ -44,6 +45,7 @@ export type BundleReport = {
   bundle: MtfBundle | null;
   failed: Venue[];
   errors: string[];
+  corroboration: Corroboration | null;
 };
 
 const PING_MS = 8_000;
@@ -120,7 +122,8 @@ export function parseAsset(raw: string | null): Asset | null {
 }
 
 export async function bundleReport(asset: Asset, now = Date.now()): Promise<BundleReport> {
-  const loaded = await loadMtfBundle(asset, now);
+  const [loaded, snaps] = await Promise.all([loadMtfBundle(asset, now), loadSourceSnaps(asset, now)]);
+  const corroboration = measureCorroboration(snaps, loaded.bundle?.venue ?? null);
   return {
     ok: loaded.bundle !== null,
     engine: ENGINE_VERSION,
@@ -129,6 +132,7 @@ export async function bundleReport(asset: Asset, now = Date.now()): Promise<Bund
     bundle: loaded.bundle,
     failed: loaded.failed,
     errors: loaded.errors,
+    corroboration,
   };
 }
 

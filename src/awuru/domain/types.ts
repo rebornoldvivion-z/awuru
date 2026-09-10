@@ -126,6 +126,21 @@ export type Decision = {
   evidenceGrade: EvidenceGrade | null;
   engineVersion: string;
   decidedAt: number;
+  userDecision: import("./constants.ts").UserDecision;
+  candidates: Candidate[];
+  best: Candidate | null;
+  secondary: Candidate | null;
+  watch: Candidate | null;
+  regime: Regime | null;
+  structure: Structure | null;
+  htfStance: { h1: import("./constants.ts").HtfStance; h4: import("./constants.ts").HtfStance };
+  corroboration: Corroboration | null;
+  thesis: Thesis | null;
+  thesisChange: import("./constants.ts").ThesisChange | null;
+  lifecycle: import("./constants.ts").LifecycleState;
+  trigger: string | null;
+  invalidation: string | null;
+  blockedByRisk: boolean;
 };
 
 export type StoredSignal = {
@@ -244,3 +259,97 @@ export type IndicatorSnapshot = {
   donchianHigh: number;
   donchianLow: number;
 };
+
+export type SwingPoint = {
+  openTime: number;
+  price: number;
+  kind: "high" | "low";
+};
+
+export type Structure = {
+  lastSwingHigh: SwingPoint | null;
+  lastSwingLow: SwingPoint | null;
+  priorSwingHigh: SwingPoint | null;
+  priorSwingLow: SwingPoint | null;
+  pattern: "hh_hl" | "lh_ll" | "hh_ll" | "lh_hl" | "undefined";
+  rangeHigh: number | null;
+  rangeLow: number | null;
+  breakout: "none" | "wick" | "close";
+  breakoutDir: Direction | null;
+  reclaim: boolean;
+  reasons: string[];
+};
+
+export type Regime = {
+  kind: import("./constants.ts").RegimeKind;
+  direction: Direction | "neutral";
+  volatility: "compressed" | "normal" | "expanded";
+  adx: number;
+  bbWidthPct: number;
+  atrPct: number;
+  reasons: string[];
+};
+
+export type SourceSnap = {
+  venue: import("./constants.ts").Venue;
+  ok: boolean;
+  lastClosedOpen: number | null;
+  lastClose: number | null;
+  ms: number;
+  error?: string;
+};
+
+export type Corroboration = {
+  status: import("./constants.ts").CorroborationState;
+  primary: import("./constants.ts").Venue | null;
+  snaps: SourceSnap[];
+  spreadPct: number | null;
+  timestampDeltaMs: number | null;
+  reason: string;
+};
+
+export type Candidate = {
+  family: import("./constants.ts").Family;
+  direction: Direction;
+  state: import("./constants.ts").LifecycleState;
+  grade: EvidenceGrade;
+  score: number;
+  rank: number;
+  regimeFit: boolean;
+  h1: import("./constants.ts").HtfStance;
+  h4: import("./constants.ts").HtfStance;
+  trigger: string;
+  invalidation: string;
+  blockers: string[];
+  reasons: string[];
+  geometry: Geometry | null;
+};
+
+export type Thesis = {
+  id: string;
+  asset: import("./constants.ts").Asset;
+  at: number;
+  barOpen: number | null;
+  venue: import("./constants.ts").Venue | null;
+  regime: import("./constants.ts").RegimeKind | null;
+  userDecision: import("./constants.ts").UserDecision;
+  direction: Direction | null;
+  family: import("./constants.ts").Family | null;
+  state: import("./constants.ts").LifecycleState;
+  evidence: string;
+  invalidation: string | null;
+  sourceQuality: string;
+  engineVersion: string;
+};
+
+export type LifecycleEvent = {
+  id: string;
+  at: number;
+  from: import("./constants.ts").LifecycleState | null;
+  to: import("./constants.ts").LifecycleState;
+  reason: string;
+  engineVersion: string;
+  asset: import("./constants.ts").Asset;
+  barOpen: number | null;
+};
+

@@ -345,7 +345,27 @@ describe("engine gates", () => {
       donchianHigh: last.close - 1,
       donchianLow: last.close - 50,
     };
-    const fams = evaluateFamilies(candles, last, fakeInd, "long", "long");
+    const fams = evaluateFamilies(candles, last, fakeInd, "long", "long", {
+      lastSwingHigh: null,
+      lastSwingLow: null,
+      priorSwingHigh: null,
+      priorSwingLow: null,
+      pattern: "hh_hl",
+      rangeHigh: last.high,
+      rangeLow: last.low,
+      breakout: "none",
+      breakoutDir: null,
+      reclaim: false,
+      reasons: [],
+    }, {
+      kind: "TREND",
+      direction: "long",
+      volatility: "normal",
+      adx: 25,
+      bbWidthPct: 0.05,
+      atrPct: 0.01,
+      reasons: ["test"],
+    });
     assert.equal(fams.length, 3);
     assert.deepEqual(fams.map((f) => f.family), ["trend", "breakout", "mean_reversion"]);
   });
