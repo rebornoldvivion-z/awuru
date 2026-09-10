@@ -2,9 +2,9 @@
 
 Personal, session-sovereign, WAIT-first market intelligence for **BTC**, **ETH**, and **Gold**.
 
-Engine **7.2.0**. Not a broker. Not a 24/7 daemon.
+Engine **7.3.0**. Not a broker. Not a 24/7 daemon.
 
-Trend continuation requires directional structure (HH/HL or LH/LL). EMA/ADX cannot override expanding HH+LL. Gold is a core market via labeled PAXG proxy.
+Trend continuation: structure → zone → retracement → reaction → trigger. EMA/ADX cannot override expanding HH+LL. Gold is a core market via labeled PAXG proxy.
 
 Gold is a core market. Current free/public support uses tokenized Gold (**PAXG**) as a clearly labeled proxy. XAUUSD spot remains a separate instrument and is currently unavailable under the verified no-account architecture.
 

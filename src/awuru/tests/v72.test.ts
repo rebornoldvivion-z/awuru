@@ -353,6 +353,6 @@ describe("v7.2 thesis notes", () => {
 
 describe("engine version", () => {
   it("is 7.2.0", () => {
-    assert.equal(ENGINE_VERSION, "7.2.0");
+    assert.equal(ENGINE_VERSION, "7.3.0");
   });
 });

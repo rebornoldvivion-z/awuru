@@ -80,6 +80,10 @@ export function ThesisCard(props: {
           }
         />
         <Row k="Source" v={`${d?.venue ?? "—"} · ${d?.corroboration?.status ?? d?.quality.state ?? "—"}`} />
+        {d?.best?.zone && (
+          <Row k="Zone" v={`${d.best.zone.origin} ${d.best.zone.low.toFixed(2)}–${d.best.zone.high.toFixed(2)}`} />
+        )}
+        {d?.best?.retraceNote && <Row k="Retrace" v={d.best.retraceNote} />}
         {d?.whyNow ? <Row k="Why now" v={d.whyNow} /> : null}
         {d?.whyNot ? <Row k="Why not" v={d.whyNot} /> : null}
         {d?.invalidation && <Row k="Invalid if" v={d.invalidation} />}
@@ -87,8 +91,8 @@ export function ThesisCard(props: {
         {d?.geometry && (
           <>
             <Row k="Entry / stop" v={`${d.geometry.entry} / ${d.geometry.stop}`} />
-            <Row k="Targets" v={`${d.geometry.tp1} · ${d.geometry.tp2} · ${d.geometry.tp3}`} />
-            <Row k="RR" v={`${d.geometry.rr.toFixed(2)} · ${d.geometry.tp1Source}`} />
+            <Row k="Targets" v={[d.geometry.tp1, d.geometry.tp2, d.geometry.tp3].filter((x) => x != null).join(" · ")} />
+            <Row k="RR" v={`${d.geometry.rr.toFixed(2)} · ${d.geometry.targetCount} target${d.geometry.targetCount > 1 ? "s" : ""}`} />
             <Row k="Stop from" v={d.geometry.stopSource} />
           </>
         )}

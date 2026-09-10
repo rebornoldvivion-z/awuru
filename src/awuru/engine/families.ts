@@ -3,12 +3,13 @@ import type { Candle, Direction, FamilyEvidence, IndicatorSnapshot, Regime, Stru
 import { priorDonchian } from "./indicators.ts";
 import { regimeFits } from "./regime.ts";
 import {
-  continuationLocation,
   invalidatorPrice,
   patternLabel,
   readLabel,
   structureInvalidation,
 } from "./structure.ts";
+import { continuationZone } from "./zones.ts";
+import { measureRetrace } from "./retrace.ts";
 
 function gradeFrom(score: number): EvidenceGrade {
   if (score >= 0.75) return "strong";
@@ -38,6 +39,11 @@ export type FamilyEval = FamilyEvidence & {
   blockers: string[];
   invalidatorPrice: number | null;
   structureRead: StructureRead | null;
+  setupKey: string | null;
+  zone: { origin: string; low: number; high: number; type: string } | null;
+  retraceNote: string | null;
+  triggerType: import("../domain/constants.ts").TriggerType | null;
+  qualityGrade: import("../domain/constants.ts").QualityGrade | null;
 };
 
 function join(parts: string[]): string {
@@ -82,49 +88,50 @@ export function evaluateTrend(
   if (ind.adx < 20) blockers.push(`ADX ${ind.adx.toFixed(1)} below trend threshold 20`);
   if (!regimeFits(regime.kind, "trend")) blockers.push(`regime ${regime.kind} is not trend/expansion context`);
 
-  const loc = thesisDir ? continuationLocation(candles, last, ind.emaFast, ind.atr, thesisDir) : null;
-  if (loc) reasons.push(loc.note);
-  if (loc && !loc.pulled) blockers.push(loc.note);
-  else if (loc && !loc.reclaimed) blockers.push(loc.note);
-
   const structuralOk = read === "BULLISH_STRUCTURE" || read === "BEARISH_STRUCTURE";
+  const zone = thesisDir && structuralOk ? continuationZone(structure, thesisDir, "15m") : null;
+  const retrace =
+    thesisDir && structuralOk
+      ? measureRetrace({ candles, last, ind, structure, direction: thesisDir, zone })
+      : null;
+  if (retrace) reasons.push(retrace.note);
+  if (retrace && retrace.phase !== "TRIGGERED") blockers.push(retrace.note);
+
   const emaAgrees = (thesisDir === "long" && emaLong) || (thesisDir === "short" && emaShort);
   const momentumOk = ind.adx >= 20;
-  const locationOk = Boolean(loc?.reclaimed);
-  const triggered = Boolean(thesisDir && structuralOk && emaAgrees && momentumOk && locationOk && regimeFits(regime.kind, "trend"));
+  const triggered = Boolean(
+    thesisDir &&
+      structuralOk &&
+      emaAgrees &&
+      momentumOk &&
+      retrace?.phase === "TRIGGERED" &&
+      regimeFits(regime.kind, "trend"),
+  );
 
   let score = 0;
-  if (emaLong || emaShort) score += 0.15;
-  if (structuralOk) score += 0.3;
-  if (momentumOk) score += 0.15;
-  if (ind.adx >= 25) score += 0.1;
-  if (loc?.pulled) score += 0.1;
-  if (loc?.reclaimed) score += 0.15;
-  if (h1 === thesisDir) score += 0.08;
-  if (h4 === thesisDir) score += 0.07;
+  if (emaLong || emaShort) score += 0.1;
+  if (structuralOk) score += 0.25;
+  if (momentumOk) score += 0.1;
+  if (retrace?.inZone) score += 0.15;
+  if (retrace?.reacted) score += 0.15;
+  if (retrace?.phase === "TRIGGERED") score += 0.2;
+  if (h1 === thesisDir) score += 0.05;
+  if (h4 === thesisDir) score += 0.05;
   if (read === "EXPANDING_RANGE" || read === "RANGE_TRANSITION") score = Math.min(score, 0.35);
 
   let state: LifecycleState = "FORMING";
   if (structuralOk && emaAgrees) state = "WATCH";
   if (read === "EXPANDING_RANGE" && (emaLong || emaShort)) state = "WATCH";
+  if (retrace?.inZone || retrace?.reacted) state = "WATCH";
   if (triggered) state = "TRIGGERED";
 
-  const invPrice = thesisDir ? invalidatorPrice(structure, thesisDir) : null;
-  const trigger = triggered
-    ? thesisDir === "long"
-      ? "15m closed reclaim above EMA21 after pullback with HH/HL intact"
-      : "15m closed rejection below EMA21 after pullback with LH/LL intact"
-    : structuralOk
-      ? loc?.pulled
-        ? "waiting for closed reclaim/rejection of EMA21 after the pullback"
-        : "waiting for a pullback into mean then a closed continuation"
-      : read === "EXPANDING_RANGE"
-        ? "waiting for LH/LL or HH/HL — expanding range is not a trend trigger"
-        : "waiting for directional swing structure";
+  const invPrice = thesisDir ? invalidatorPrice(structure, thesisDir) : zone?.low && thesisDir === "long" ? zone.low : zone?.high ?? null;
+  const trigger = retrace?.triggerEvidence
+    || (retrace ? retrace.note : read === "EXPANDING_RANGE"
+      ? "waiting for LH/LL or HH/HL — expanding range is not a trend trigger"
+      : "waiting for directional swing structure");
 
-  const whyNow = triggered
-    ? join([readLabel(read), loc?.note ?? "", `ADX ${ind.adx.toFixed(1)}`, "closed continuation trigger"])
-    : "";
+  const whyNow = triggered ? join([readLabel(read), retrace?.triggerEvidence ?? "", `ADX ${ind.adx.toFixed(1)}`]) : "";
   const whyNot = triggered ? "" : join(blockers.length ? blockers : ["trend thesis incomplete"]);
 
   const eligible = Boolean(thesisDir && structuralOk && score >= 0.45);
@@ -135,7 +142,7 @@ export function evaluateTrend(
     grade: gradeFrom(score),
     score,
     reasons,
-    invalidation: thesisDir ? structureInvalidation(structure, thesisDir) : null,
+    invalidation: thesisDir ? (zone?.invalidIf ?? structureInvalidation(structure, thesisDir)) : null,
     whyNow: whyNow || reasons[0] || "",
     whyNot,
     state,
@@ -143,6 +150,11 @@ export function evaluateTrend(
     blockers,
     invalidatorPrice: invPrice,
     structureRead: read,
+    setupKey: zone ? `${zone.createdAt}` : null,
+    zone: zone ? { origin: zone.origin, low: zone.low, high: zone.high, type: zone.type } : null,
+    retraceNote: retrace?.note ?? null,
+    triggerType: retrace?.triggerType ?? "none",
+    qualityGrade: retrace?.quality ?? "weak",
   };
 }
 
@@ -227,6 +239,11 @@ export function evaluateBreakout(
     blockers,
     invalidatorPrice: direction === "long" ? (prior?.high ?? null) : direction === "short" ? (prior?.low ?? null) : null,
     structureRead: structure.read,
+    setupKey: prior ? String(prior.high) : null,
+    zone: prior ? { origin: "donchian", low: prior.low, high: prior.high, type: "DONCHIAN" } : null,
+    retraceNote: null,
+    triggerType: state === "TRIGGERED" ? "closed_breakout" : "none",
+    qualityGrade: state === "TRIGGERED" ? "good" : "weak",
   };
 }
 
@@ -284,6 +301,11 @@ export function evaluateMeanReversion(
     blockers,
     invalidatorPrice: ind.bbMid,
     structureRead: structure.read,
+    setupKey: null,
+    zone: { origin: "bollinger", low: ind.bbLower, high: ind.bbUpper, type: "RANGE_HIGH" },
+    retraceNote: null,
+    triggerType: state === "TRIGGERED" ? "reclaim_close" : "none",
+    qualityGrade: eligible ? "mixed" : "weak",
   };
 }
 

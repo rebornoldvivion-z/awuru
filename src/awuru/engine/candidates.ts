@@ -61,6 +61,11 @@ export function buildCandidates(
       whyNow: f.whyNow,
       whyNot,
       structureRead: f.structureRead,
+      setupId: f.setupKey,
+      zone: f.zone,
+      retraceNote: f.retraceNote,
+      triggerType: f.triggerType,
+      qualityGrade: f.qualityGrade,
     });
   }
   out.sort((a, b) => b.score - a.score || a.family.localeCompare(b.family));

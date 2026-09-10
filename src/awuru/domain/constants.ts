@@ -1,7 +1,7 @@
-export const ENGINE_VERSION = "7.2.0";
+export const ENGINE_VERSION = "7.3.0";
 export const APP_NAME = "AWURU v7 — Discipline Desk";
 export const DB_NAME = "awuru-v7";
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 export const ASSETS = ["BTC", "ETH", "GOLD"] as const;
 export type Asset = (typeof ASSETS)[number];
@@ -241,7 +241,20 @@ export const STRUCTURE_READS = [
 ] as const;
 export type StructureRead = (typeof STRUCTURE_READS)[number];
 
+export const ZONE_TYPES = ["SWING_SUPPORT", "SWING_RESISTANCE", "RANGE_HIGH", "RANGE_LOW", "DONCHIAN"] as const;
+export type ZoneType = (typeof ZONE_TYPES)[number];
+
+export const RETRACE_PHASES = ["NONE", "IMPULSE", "RETRACING", "IN_ZONE", "REACTED", "TRIGGERED"] as const;
+export type RetracePhase = (typeof RETRACE_PHASES)[number];
+
+export const TRIGGER_TYPES = ["none", "rejection_close", "reclaim_close", "closed_breakout"] as const;
+export type TriggerType = (typeof TRIGGER_TYPES)[number];
+
+export const QUALITY_GRADES = ["weak", "mixed", "good", "strong"] as const;
+export type QualityGrade = (typeof QUALITY_GRADES)[number];
+
 export const MIN_RELEASE_RR = 1.2;
+export const SETUP_TTL_BARS = 16;
 export const AGREE_SPREAD_PCT = 0.0015;
 export const DIVERGE_SPREAD_PCT = 0.005;
 export const AGREE_TS_MS = INTERVAL_MS["15m"];

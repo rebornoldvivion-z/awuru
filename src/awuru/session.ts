@@ -28,6 +28,8 @@ import {
   saveRiskDay,
   saveShadow,
   saveThesis,
+  saveSetup,
+  getSetup,
 } from "./persist.ts";
 import { applyMissionClose, applyMissionOpen } from "./risk.ts";
 import { scoreMissionGeometry, scoreShadow } from "./shadow.ts";
@@ -192,6 +194,33 @@ export const useSession = create<Session>((set, get) => ({
       d.thesis = nextThesis;
       d.thesisChange = change;
       await saveThesis(nextThesis);
+      const best = d.best;
+      if (best?.setupId && d.venue && best.zone && d.family && d.direction && d.instrument) {
+        const sid = `${d.asset}|${d.venue}|${best.family}|${best.direction}|${best.setupId}|${ENGINE_VERSION}`;
+        const prevSetup = await getSetup(sid);
+        const invalidated =
+          d.structure && d.invalidation && d.userDecision === "WAIT" && (d.waitCode === "WAIT_REGIME" || d.structure.read === "EXPANDING_RANGE") && prevSetup
+            ? "INVALIDATED"
+            : best.state;
+        await saveSetup({
+          id: sid,
+          asset: d.asset,
+          venue: d.venue,
+          instrument: d.instrument,
+          family: best.family,
+          direction: best.direction,
+          zoneOrigin: best.zone.origin,
+          zoneLow: best.zone.low,
+          zoneHigh: best.zone.high,
+          state: prevSetup?.state === "INVALIDATED" ? "INVALIDATED" : invalidated === "RELEASED" ? "RELEASED" : best.state,
+          createdAt: prevSetup?.createdAt ?? t,
+          updatedAt: t,
+          barOpen: d.barOpen ?? 0,
+          engineVersion: ENGINE_VERSION,
+          triggerType: best.triggerType ?? "none",
+          invalidation: best.invalidation,
+        });
+      }
       if (change !== "UNCHANGED") {
         await addEvent({ id: newId("evt"), at: t, type: "thesis", detail: `${describeThesisShift(prev, nextThesis)} · ${reason}` });
         const lc: LifecycleEvent = {
@@ -227,8 +256,8 @@ export const useSession = create<Session>((set, get) => ({
           entry: d.geometry.entry,
           stop: d.geometry.stop,
           tp1: d.geometry.tp1,
-          tp2: d.geometry.tp2,
-          tp3: d.geometry.tp3,
+          tp2: d.geometry.tp2 ?? d.geometry.tp1,
+          tp3: d.geometry.tp3 ?? d.geometry.tp2 ?? d.geometry.tp1,
           family: d.family,
           evidenceGrade: d.evidenceGrade,
           persona: d.persona,
@@ -321,8 +350,8 @@ export const useSession = create<Session>((set, get) => ({
       entry: decision.geometry.entry,
       stop: decision.geometry.stop,
       tp1: decision.geometry.tp1,
-      tp2: decision.geometry.tp2,
-      tp3: decision.geometry.tp3,
+      tp2: decision.geometry.tp2 ?? decision.geometry.tp1,
+      tp3: decision.geometry.tp3 ?? decision.geometry.tp2 ?? decision.geometry.tp1,
       qty: decision.size.qty,
       riskCash: decision.size.riskCash,
       status: "open",

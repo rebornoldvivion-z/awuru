@@ -557,7 +557,7 @@ describe("idempotent signal ids", () => {
       persona: "Orion",
     });
     assert.equal(a, b);
-    assert.ok(a.includes("7.2.0"));
+    assert.ok(a.includes("7.3.0"));
   });
 });
 

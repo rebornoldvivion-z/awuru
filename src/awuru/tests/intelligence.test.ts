@@ -178,16 +178,19 @@ describe("candidates + ranking", () => {
         family: "trend" as const, eligible: true, direction: "long" as const, grade: "mixed" as const, score: 0.6,
         reasons: ["t"], invalidation: "x", state: "TRIGGERED" as const, trigger: "ema", blockers: [],
         whyNow: "t", whyNot: "", invalidatorPrice: 90, structureRead: "BULLISH_STRUCTURE" as const,
+        setupKey: "1", zone: { origin: "HL", low: 90, high: 91, type: "SWING_SUPPORT" }, retraceNote: "in zone", triggerType: "reclaim_close" as const, qualityGrade: "good" as const,
       },
       {
         family: "breakout" as const, eligible: true, direction: "long" as const, grade: "weak" as const, score: 0.3,
         reasons: ["b"], invalidation: "y", state: "WATCH" as const, trigger: "close", blockers: ["wick"],
         whyNow: "", whyNot: "wick", invalidatorPrice: 91, structureRead: "BULLISH_STRUCTURE" as const,
+        setupKey: "2", zone: null, retraceNote: null, triggerType: "none" as const, qualityGrade: "weak" as const,
       },
       {
         family: "mean_reversion" as const, eligible: false, direction: "short" as const, grade: "weak" as const, score: 0.2,
         reasons: ["m"], invalidation: "z", state: "FORMING" as const, trigger: "band", blockers: ["trend"],
         whyNow: "", whyNot: "trend", invalidatorPrice: 100, structureRead: "RANGE_TRANSITION" as const,
+        setupKey: null, zone: null, retraceNote: null, triggerType: "none" as const, qualityGrade: "weak" as const,
       },
     ];
     const regime = { kind: "TREND" as const, direction: "long" as const, volatility: "normal" as const, adx: 28, bbWidthPct: 0.05, atrPct: 0.01, reasons: [] };

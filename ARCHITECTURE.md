@@ -1,7 +1,7 @@
 # AWURU v7 — Architecture
 
 Product: **AWURU v7 — Discipline Desk**  
-Engine **7.2.0** — structure-gated trend continuation on Model B. Core markets: **BTC, ETH, GOLD**.
+Engine **7.3.0** — zone/retrace/trigger on Model B. Core markets: **BTC, ETH, GOLD**.
 
 ```
 USER (Desk focused)

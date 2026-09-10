@@ -6,12 +6,13 @@ import type {
   Mission,
   Profile,
   RiskDay,
+  SetupRecord,
   Shadow,
   StoredSignal,
   Thesis,
 } from "../domain/types.ts";
 
-const STORES = ["profile", "accounts", "signals", "missions", "shadows", "risk_days", "events", "thesis", "lifecycle"] as const;
+const STORES = ["profile", "accounts", "signals", "missions", "shadows", "risk_days", "events", "thesis", "lifecycle", "setups"] as const;
 type StoreName = (typeof STORES)[number];
 
 function defaultProfile(): Profile {
@@ -193,6 +194,18 @@ export async function addLifecycle(e: LifecycleEvent): Promise<void> {
 export async function listLifecycle(): Promise<LifecycleEvent[]> {
   const all = await getAll<LifecycleEvent>("lifecycle");
   return all.sort((a, b) => b.at - a.at);
+}
+
+export async function saveSetup(s: SetupRecord): Promise<void> {
+  await put("setups", s);
+}
+
+export async function getSetup(id: string): Promise<SetupRecord | undefined> {
+  return get<SetupRecord>("setups", id);
+}
+
+export async function listSetups(): Promise<SetupRecord[]> {
+  return getAll<SetupRecord>("setups");
 }
 
 export async function available(): Promise<boolean> {

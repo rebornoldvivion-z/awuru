@@ -3,7 +3,7 @@
 Frozen. Do not reopen provider research.
 
 Product: **AWURU v7 — Discipline Desk**  
-Engine: **7.2.0** (structure-gated trend). Historical 7.0.x / 7.1.x records stay frozen.
+Engine: **7.3.0** (structural retracement). Historical 7.0–7.2 records stay frozen.
 
 Runtime: **Model B** — Vercel/Nitro UI host + dumb public market-data proxy. Browser-only intelligence. IndexedDB ledger.
 

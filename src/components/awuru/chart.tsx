@@ -70,8 +70,8 @@ export function CandleChart({ candles, live, geometry }: Props) {
         mk(geometry.entry, "#c8ccd4", "ENTRY");
         mk(geometry.stop, "#b07070", "SL");
         mk(geometry.tp1, "#7d9a84", "TP1");
-        mk(geometry.tp2, "#7d9a84", "TP2");
-        mk(geometry.tp3, "#7d9a84", "TP3");
+        if (geometry.tp2 != null) mk(geometry.tp2, "#7d9a84", "TP2");
+        if (geometry.tp3 != null) mk(geometry.tp3, "#7d9a84", "TP3");
       }
       if (live && data.length) {
         const t = Math.floor(live.openTime / 1000);

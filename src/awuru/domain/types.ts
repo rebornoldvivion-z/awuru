@@ -80,8 +80,9 @@ export type Geometry = {
   entry: number;
   stop: number;
   tp1: number;
-  tp2: number;
-  tp3: number;
+  tp2: number | null;
+  tp3: number | null;
+  targetCount: 1 | 2 | 3;
   riskPerUnit: number;
   rr: number;
   expiry: number;
@@ -355,6 +356,11 @@ export type Candidate = {
   whyNow: string;
   whyNot: string;
   structureRead: import("./constants.ts").StructureRead | null;
+  setupId: string | null;
+  zone: { origin: string; low: number; high: number; type: string } | null;
+  retraceNote: string | null;
+  triggerType: import("./constants.ts").TriggerType | null;
+  qualityGrade: import("./constants.ts").QualityGrade | null;
 };
 
 export type Thesis = {
@@ -375,6 +381,25 @@ export type Thesis = {
   structureRead: import("./constants.ts").StructureRead | null;
   whyNow: string | null;
   whyNot: string | null;
+};
+
+export type SetupRecord = {
+  id: string;
+  asset: import("./constants.ts").Asset;
+  venue: import("./constants.ts").Venue;
+  instrument: string;
+  family: import("./constants.ts").Family;
+  direction: Direction;
+  zoneOrigin: string;
+  zoneLow: number;
+  zoneHigh: number;
+  state: import("./constants.ts").LifecycleState;
+  createdAt: number;
+  updatedAt: number;
+  barOpen: number;
+  engineVersion: string;
+  triggerType: import("./constants.ts").TriggerType;
+  invalidation: string;
 };
 
 export type LifecycleEvent = {
