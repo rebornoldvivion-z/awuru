@@ -9,12 +9,11 @@ export function buildCandidates(
   h1Bias: Direction | "neutral",
   h4Bias: Direction | "neutral",
   regime: Regime,
-  geometryFor: (direction: Direction) => Geometry | null,
+  geometryFor: (direction: Direction, inv: number | null) => Geometry | null,
 ): Candidate[] {
   const out: Candidate[] = [];
   for (const f of evals) {
     if (!f.direction) continue;
-    if (f.score < 0.2 && f.state === "FORMING" && f.blockers.length === 0 && !f.eligible) continue;
     const h1 = htfStance(h1Bias, f.direction);
     const h4 = htfStance(h4Bias, f.direction);
     const blockers = [...f.blockers];
@@ -28,15 +27,21 @@ export function buildCandidates(
     }
     const fit = regimeFits(regime.kind, f.family);
     if (!fit) blockers.push(`regime ${regime.kind} poorly fits ${f.family}`);
+    const geo =
+      f.eligible || state === "TRIGGERED" || state === "WATCH"
+        ? geometryFor(f.direction, f.invalidatorPrice)
+        : null;
     let rankScore = f.score;
-    if (fit) rankScore += 0.12;
-    if (h4 === "SUPPORTIVE") rankScore += 0.12;
-    else if (h4 === "NEUTRAL") rankScore += 0.05;
-    if (h1 === "SUPPORTIVE") rankScore += 0.08;
-    else if (h1 === "NEUTRAL") rankScore += 0.03;
-    if (state === "TRIGGERED") rankScore += 0.1;
-    if (state === "WATCH") rankScore += 0.04;
-    const geo = f.eligible || state === "TRIGGERED" || state === "WATCH" ? geometryFor(f.direction) : null;
+    if (f.structureRead === "BULLISH_STRUCTURE" || f.structureRead === "BEARISH_STRUCTURE") rankScore += 0.2;
+    if (f.structureRead === "EXPANDING_RANGE" || f.structureRead === "RANGE_TRANSITION") rankScore -= 0.2;
+    if (fit) rankScore += 0.08;
+    if (h4 === "SUPPORTIVE") rankScore += 0.08;
+    else if (h4 === "OPPOSING") rankScore -= 0.15;
+    if (h1 === "SUPPORTIVE") rankScore += 0.05;
+    if (state === "TRIGGERED") rankScore += 0.12;
+    if (geo && geo.rr >= 1.5) rankScore += 0.1;
+    if (geo && geo.rr < 1.2) rankScore -= 0.1;
+    const whyNot = state === "TRIGGERED" ? f.whyNot : [f.whyNot, ...blockers.filter((b) => !f.whyNot.includes(b))].filter(Boolean).join(" · ");
     out.push({
       family: f.family,
       direction: f.direction,
@@ -49,12 +54,16 @@ export function buildCandidates(
       h4,
       trigger: f.trigger,
       invalidation: f.invalidation ?? "thesis breaks",
+      invalidatorPrice: f.invalidatorPrice,
       blockers,
       reasons: f.reasons,
       geometry: geo,
+      whyNow: f.whyNow,
+      whyNot,
+      structureRead: f.structureRead,
     });
   }
-  out.sort((a, b) => b.score - a.score);
+  out.sort((a, b) => b.score - a.score || a.family.localeCompare(b.family));
   out.forEach((c, i) => {
     c.rank = i + 1;
   });

@@ -3,7 +3,7 @@
 Frozen. Do not reopen provider research.
 
 Product: **AWURU v7 — Discipline Desk**  
-Engine: **7.1.0** (terminal intelligence). Historical 7.0.0 records stay frozen.
+Engine: **7.2.0** (structure-gated trend). Historical 7.0.x / 7.1.x records stay frozen.
 
 Runtime: **Model B** — Vercel/Nitro UI host + dumb public market-data proxy. Browser-only intelligence. IndexedDB ledger.
 
@@ -14,6 +14,8 @@ Runtime: **Model B** — Vercel/Nitro UI host + dumb public market-data proxy. B
 3. BACKUP `https://www.okx.com/api/v5` — market/candles + public/instruments — BTC-USDT ETH-USDT
 
 Do not use `api.binance.com` as primary. Do not stitch venues. Do not average candles.
+
+Trend RELEASE requires directional structure (HH/HL long or LH/LL short). Expanding HH+LL is WATCH/WAIT, never a trend SELL/BUY. Prose is generated from the structure object. Stop is the invalidator. RR is computed, not hardcoded to 1.
 
 ## Public API (data only)
 

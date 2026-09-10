@@ -19,6 +19,7 @@ import type {
   Profile,
   Quality,
   RiskDay,
+  TfContext,
 } from "../domain/types.ts";
 import { lastClosed } from "../market/candles.ts";
 import { disagreement, evaluateFamilies, htfBiasFrom, pickPrimary } from "./families.ts";
@@ -48,6 +49,8 @@ const intel = {
   trigger: null as string | null,
   invalidation: null as string | null,
   blockedByRisk: false,
+  whyNow: null as string | null,
+  whyNot: null as string | null,
 };
 
 function waitDecision(partial: Partial<Decision>): Decision {
@@ -82,7 +85,14 @@ function waitDecision(partial: Partial<Decision>): Decision {
 }
 
 function emptyHtf() {
-  return { h1Bias: "neutral" as const, h4Bias: "neutral" as const, h1ClosedOpen: null, h4ClosedOpen: null };
+  return {
+    h1Bias: "neutral" as const,
+    h4Bias: "neutral" as const,
+    h1ClosedOpen: null as number | null,
+    h4ClosedOpen: null as number | null,
+    h1: null,
+    h4: null,
+  };
 }
 
 function qualityDecision(
@@ -233,17 +243,32 @@ export function decide(args: {
   const prior = priorDonchian(s15.candles);
   const structure = readStructure(s15.candles, prior);
   const regime = classifyRegime(last15, ind15, s15.candles, structure);
+  const st1 = readStructure(s1h.candles);
+  const st4 = readStructure(s4h.candles);
+  const rg1 = last1h && ind1h ? classifyRegime(last1h, ind1h, s1h.candles, st1) : null;
+  const rg4 = last4h && ind4h ? classifyRegime(last4h, ind4h, s4h.candles, st4) : null;
   const h1Bias = htfBiasFrom(ind1h, last1h);
   const h4Bias = htfBiasFrom(ind4h, last4h);
+  const h1ctx: TfContext | null =
+    ind1h && rg1
+      ? { bias: h1Bias, adx: ind1h.adx, structureRead: st1.read, regime: rg1.kind, role: "continuation context" }
+      : null;
+  const h4ctx: TfContext | null =
+    ind4h && rg4
+      ? { bias: h4Bias, adx: ind4h.adx, structureRead: st4.read, regime: rg4.kind, role: "higher-timeframe structure" }
+      : null;
   const htf = {
     h1Bias,
     h4Bias,
     h1ClosedOpen: last1h.openTime,
     h4ClosedOpen: last4h.openTime,
+    h1: h1ctx,
+    h4: h4ctx,
   };
 
   const families = evaluateFamilies(s15.candles, last15, ind15, h1Bias, h4Bias, structure, regime);
-  const geoFn = (direction: Direction): Geometry | null => {
+  const geoFn = (direction: Direction, inv: number | null): Geometry | null => {
+    if (inv == null) return null;
     const g = geometryFromBars({
       direction,
       candles: s15.candles,
@@ -251,6 +276,8 @@ export function decide(args: {
       ind: ind15,
       filters: bundle.filters,
       timeframe: PRIMARY_TF,
+      structure,
+      invalidatorPrice: inv,
     });
     return "error" in g ? null : g;
   };
@@ -291,6 +318,8 @@ export function decide(args: {
       invalidation: watch?.invalidation ?? slots.best?.invalidation ?? null,
       userDecision: "WAIT",
       blockedByRisk: extra.blockedByRisk ?? false,
+      whyNow: extra.whyNow ?? watch?.whyNow ?? slots.best?.whyNow ?? null,
+      whyNot: extra.whyNot ?? extra.waitDetail ?? watch?.whyNot ?? slots.best?.whyNot ?? null,
     });
     d.userDecision = userOf("WAIT", d.direction, d.watch, d.best);
     return d;
@@ -357,11 +386,14 @@ export function decide(args: {
     ind: ind15,
     filters: bundle.filters,
     timeframe: PRIMARY_TF,
+    structure,
+    invalidatorPrice: cand?.invalidatorPrice ?? 0,
   });
-  if ("error" in geo) {
+  if (!cand?.invalidatorPrice || "error" in geo) {
+    const geoErr = "error" in geo ? geo.error : "no invalidator price — stop cannot be derived from thesis";
     return finishWait({
       waitCode: "WAIT_GEOMETRY",
-      waitDetail: geo.error,
+      waitDetail: !cand?.invalidatorPrice ? "no invalidator price — stop cannot be derived from thesis" : geoErr,
       direction: dir,
       family: primary.family,
       evidenceGrade: primary.grade,
@@ -470,6 +502,8 @@ export function decide(args: {
     blockedByRisk: false,
     userDecision: dir === "long" ? "BUY" : "SELL",
     best: cand ? { ...cand, state: "RELEASED", geometry: geo } : slots.best,
+    whyNow: cand?.whyNow || cand?.reasons[0] || "closed continuation trigger held",
+    whyNot: null,
   };
   return released;
 }

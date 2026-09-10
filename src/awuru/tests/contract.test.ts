@@ -303,6 +303,8 @@ describe("engine gates", () => {
         score: 0.6,
         reasons: ["t"],
         invalidation: null,
+        whyNow: "t",
+        whyNot: "",
       },
       {
         family: "breakout",
@@ -312,6 +314,8 @@ describe("engine gates", () => {
         score: 0.6,
         reasons: ["b"],
         invalidation: null,
+        whyNow: "b",
+        whyNot: "",
       },
       {
         family: "mean_reversion",
@@ -321,6 +325,8 @@ describe("engine gates", () => {
         score: 0,
         reasons: ["m"],
         invalidation: null,
+        whyNow: "",
+        whyNot: "m",
       },
     ];
     assert.equal(disagreement(families), true);
@@ -337,7 +343,7 @@ describe("engine gates", () => {
     if (d.kind === "RELEASE") {
       assert.fail("tiny equity must not RELEASE");
     }
-    assert.ok(d.waitCode === "WAIT_UNSIZEABLE" || d.waitCode === "WAIT_REGIME" || d.waitCode === "WAIT_HTF" || d.waitCode === "WAIT_GEOMETRY" || d.waitCode === "WAIT_DISAGREEMENT" || d.waitCode === "WAIT_DATA");
+    assert.ok(d.waitCode === "WAIT_UNSIZEABLE" || d.waitCode === "WAIT_REGIME" || d.waitCode === "WAIT_HTF" || d.waitCode === "WAIT_GEOMETRY" || d.waitCode === "WAIT_DISAGREEMENT" || d.waitCode === "WAIT_DATA" || d.waitCode === "WAIT_TRIGGER" || d.waitCode === "WAIT_EVIDENCE");
   });
 
   it("families are three distinct hypotheses", () => {
@@ -364,6 +370,7 @@ describe("engine gates", () => {
       priorSwingHigh: null,
       priorSwingLow: null,
       pattern: "hh_hl",
+      read: "BULLISH_STRUCTURE",
       rangeHigh: last.high,
       rangeLow: last.low,
       breakout: "none",

@@ -1,8 +1,14 @@
-import type { EvidenceGrade, Family, HtfStance, LifecycleState } from "../domain/constants.ts";
+import type { EvidenceGrade, Family, HtfStance, LifecycleState, StructureRead } from "../domain/constants.ts";
 import type { Candle, Direction, FamilyEvidence, IndicatorSnapshot, Regime, Structure } from "../domain/types.ts";
 import { priorDonchian } from "./indicators.ts";
 import { regimeFits } from "./regime.ts";
-import { structureInvalidation } from "./structure.ts";
+import {
+  continuationLocation,
+  invalidatorPrice,
+  patternLabel,
+  readLabel,
+  structureInvalidation,
+} from "./structure.ts";
 
 function gradeFrom(score: number): EvidenceGrade {
   if (score >= 0.75) return "strong";
@@ -30,9 +36,16 @@ export type FamilyEval = FamilyEvidence & {
   state: LifecycleState;
   trigger: string;
   blockers: string[];
+  invalidatorPrice: number | null;
+  structureRead: StructureRead | null;
 };
 
+function join(parts: string[]): string {
+  return parts.filter(Boolean).join(" · ");
+}
+
 export function evaluateTrend(
+  candles: Candle[],
   last: Candle,
   ind: IndicatorSnapshot,
   h1: Direction | "neutral",
@@ -42,52 +55,94 @@ export function evaluateTrend(
 ): FamilyEval {
   const reasons: string[] = [];
   const blockers: string[] = [];
-  let direction: Direction | null = null;
-  if (structure.pattern === "hh_hl" || (last.close > ind.emaFast && ind.emaFast > ind.emaSlow && ind.plusDi > ind.minusDi)) {
-    direction = "long";
-  } else if (structure.pattern === "lh_ll" || (last.close < ind.emaFast && ind.emaFast < ind.emaSlow && ind.minusDi > ind.plusDi)) {
-    direction = "short";
+  const read = structure.read;
+  const emaLong = last.close > ind.emaFast && ind.emaFast > ind.emaSlow && ind.plusDi > ind.minusDi;
+  const emaShort = last.close < ind.emaFast && ind.emaFast < ind.emaSlow && ind.minusDi > ind.plusDi;
+  reasons.push(`${readLabel(read)} (${patternLabel(structure.pattern)})`);
+  if (emaLong) reasons.push(`EMA stack long (close > EMA21 > EMA50)`);
+  if (emaShort) reasons.push(`EMA stack short (close < EMA21 < EMA50)`);
+  reasons.push(`ADX ${ind.adx.toFixed(1)}`);
+
+  let thesisDir: Direction | null = null;
+  if (read === "BULLISH_STRUCTURE") thesisDir = "long";
+  else if (read === "BEARISH_STRUCTURE") thesisDir = "short";
+  else if (emaLong) thesisDir = "long";
+  else if (emaShort) thesisDir = "short";
+
+  if (read === "EXPANDING_RANGE") {
+    blockers.push("HH and LL together — expanding range, not a directional trend");
+  } else if (read === "RANGE_TRANSITION") {
+    blockers.push("LH+HL overlapping swings — range/transition, not continuation");
+  } else if (read === "UNKNOWN") {
+    blockers.push("insufficient confirmed swings for directional structure");
   }
-  if (structure.pattern === "hh_hl") reasons.push("HH/HL structure");
-  if (structure.pattern === "lh_ll") reasons.push("LH/LL structure");
-  if (direction === "long") reasons.push("close > EMA21 > EMA50");
-  if (direction === "short") reasons.push("close < EMA21 < EMA50");
-  const trending = ind.adx >= 20;
-  if (!trending) {
-    reasons.push(`ADX ${ind.adx.toFixed(1)} < 20`);
-    blockers.push("trend strength not confirmed");
-  }
-  if (!regimeFits(regime.kind, "trend")) blockers.push(`regime ${regime.kind} is not a trend continuation`);
+
+  if (read === "BULLISH_STRUCTURE" && !emaLong) blockers.push("EMA stack does not agree with bullish structure");
+  if (read === "BEARISH_STRUCTURE" && !emaShort) blockers.push("EMA stack does not agree with bearish structure");
+  if (ind.adx < 20) blockers.push(`ADX ${ind.adx.toFixed(1)} below trend threshold 20`);
+  if (!regimeFits(regime.kind, "trend")) blockers.push(`regime ${regime.kind} is not trend/expansion context`);
+
+  const loc = thesisDir ? continuationLocation(candles, last, ind.emaFast, ind.atr, thesisDir) : null;
+  if (loc) reasons.push(loc.note);
+  if (loc && !loc.pulled) blockers.push(loc.note);
+  else if (loc && !loc.reclaimed) blockers.push(loc.note);
+
+  const structuralOk = read === "BULLISH_STRUCTURE" || read === "BEARISH_STRUCTURE";
+  const emaAgrees = (thesisDir === "long" && emaLong) || (thesisDir === "short" && emaShort);
+  const momentumOk = ind.adx >= 20;
+  const locationOk = Boolean(loc?.reclaimed);
+  const triggered = Boolean(thesisDir && structuralOk && emaAgrees && momentumOk && locationOk && regimeFits(regime.kind, "trend"));
+
   let score = 0;
-  if (direction && trending) {
-    score = 0.4;
-    if (structure.pattern === "hh_hl" || structure.pattern === "lh_ll") score += 0.15;
-    if (ind.adx >= 25) score += 0.15;
-    if (h1 === direction) score += 0.1;
-    if (h4 === direction) score += 0.15;
-  }
+  if (emaLong || emaShort) score += 0.15;
+  if (structuralOk) score += 0.3;
+  if (momentumOk) score += 0.15;
+  if (ind.adx >= 25) score += 0.1;
+  if (loc?.pulled) score += 0.1;
+  if (loc?.reclaimed) score += 0.15;
+  if (h1 === thesisDir) score += 0.08;
+  if (h4 === thesisDir) score += 0.07;
+  if (read === "EXPANDING_RANGE" || read === "RANGE_TRANSITION") score = Math.min(score, 0.35);
+
   let state: LifecycleState = "FORMING";
-  if (direction && trending && regimeFits(regime.kind, "trend")) {
-    const pulled =
-      direction === "long" ? last.close < ind.emaFast && last.low <= ind.emaFast : last.close > ind.emaFast && last.high >= ind.emaFast;
-    state = pulled ? "WATCH" : "TRIGGERED";
-    if (pulled) {
-      blockers.push("waiting for EMA reclaim after pullback");
-      reasons.push("pullback into EMA — continuation not confirmed");
-    }
-  }
-  const eligible = Boolean(direction && score >= 0.4);
+  if (structuralOk && emaAgrees) state = "WATCH";
+  if (read === "EXPANDING_RANGE" && (emaLong || emaShort)) state = "WATCH";
+  if (triggered) state = "TRIGGERED";
+
+  const invPrice = thesisDir ? invalidatorPrice(structure, thesisDir) : null;
+  const trigger = triggered
+    ? thesisDir === "long"
+      ? "15m closed reclaim above EMA21 after pullback with HH/HL intact"
+      : "15m closed rejection below EMA21 after pullback with LH/LL intact"
+    : structuralOk
+      ? loc?.pulled
+        ? "waiting for closed reclaim/rejection of EMA21 after the pullback"
+        : "waiting for a pullback into mean then a closed continuation"
+      : read === "EXPANDING_RANGE"
+        ? "waiting for LH/LL or HH/HL — expanding range is not a trend trigger"
+        : "waiting for directional swing structure";
+
+  const whyNow = triggered
+    ? join([readLabel(read), loc?.note ?? "", `ADX ${ind.adx.toFixed(1)}`, "closed continuation trigger"])
+    : "";
+  const whyNot = triggered ? "" : join(blockers.length ? blockers : ["trend thesis incomplete"]);
+
+  const eligible = Boolean(thesisDir && structuralOk && score >= 0.45);
   return {
     family: "trend",
     eligible,
-    direction,
+    direction: thesisDir,
     grade: gradeFrom(score),
     score,
     reasons,
-    invalidation: direction ? structureInvalidation(structure, direction) : null,
+    invalidation: thesisDir ? structureInvalidation(structure, thesisDir) : null,
+    whyNow: whyNow || reasons[0] || "",
+    whyNot,
     state,
-    trigger: direction === "long" ? "close reclaimed above EMA21 with HH/HL intact" : "close rejected below EMA21 with LH/LL intact",
+    trigger,
     blockers,
+    invalidatorPrice: invPrice,
+    structureRead: read,
   };
 }
 
@@ -105,45 +160,58 @@ export function evaluateBreakout(
   const blockers: string[] = [];
   let direction: Direction | null = null;
   let state: LifecycleState = "FORMING";
+  let trigger = "waiting for a closed 15m break of the prior 20-bar range";
   if (prior) {
     if (last.close > prior.high) {
       direction = "long";
       state = "TRIGGERED";
-      reasons.push(`close ${last.close} broke prior Donchian high ${prior.high}`);
+      reasons.push(`15m close ${last.close} broke prior Donchian high ${prior.high}`);
+      trigger = `closed 15m hold above ${prior.high}`;
     } else if (last.close < prior.low) {
       direction = "short";
       state = "TRIGGERED";
-      reasons.push(`close ${last.close} broke prior Donchian low ${prior.low}`);
+      reasons.push(`15m close ${last.close} broke prior Donchian low ${prior.low}`);
+      trigger = `closed 15m hold below ${prior.low}`;
     } else if (last.high > prior.high) {
       direction = "long";
       state = "FORMING";
-      reasons.push("wick through range high — close still inside");
-      blockers.push("needs closing breakout, not a wick");
+      reasons.push(`wick through ${prior.high} — close still inside`);
+      blockers.push("wick is not a closed breakout");
+      trigger = `waiting for 15m close above ${prior.high}`;
     } else if (last.low < prior.low) {
       direction = "short";
       state = "FORMING";
-      reasons.push("wick through range low — close still inside");
-      blockers.push("needs closing breakout, not a wick");
+      reasons.push(`wick through ${prior.low} — close still inside`);
+      blockers.push("wick is not a closed breakout");
+      trigger = `waiting for 15m close below ${prior.low}`;
     } else {
       reasons.push("no Donchian break of the prior 20-bar range");
     }
   }
   if (structure.breakout === "wick") {
     state = "FORMING";
-    blockers.push("wick-only probe");
+    blockers.push("wick-only probe of range");
   }
-  if (regime.kind === "TREND" && state === "TRIGGERED") reasons.push("break in an already trending tape");
   if (regime.kind === "COMPRESSION") reasons.push("break from compression");
   let score = 0;
   if (direction) {
-    score = state === "TRIGGERED" ? 0.45 : 0.25;
+    score = state === "TRIGGERED" ? 0.5 : 0.25;
     if (regime.volatility === "expanded") score += 0.1;
-    if (ind.adx >= 18) score += 0.1;
     if (h1 === direction) score += 0.1;
-    if (h4 === direction) score += 0.15;
+    if (h4 === direction) score += 0.1;
     if (structure.reclaim) score += 0.1;
   }
-  const eligible = Boolean(direction && score >= 0.25);
+  const eligible = Boolean(direction && score >= 0.25 && state === "TRIGGERED");
+  const inv =
+    direction === "long"
+      ? prior
+        ? `close back inside prior range below ${prior.high}`
+        : "close back inside prior range"
+      : direction === "short"
+        ? prior
+          ? `close back inside prior range above ${prior.low}`
+          : "close back inside prior range"
+        : null;
   return {
     family: "breakout",
     eligible,
@@ -151,10 +219,14 @@ export function evaluateBreakout(
     grade: gradeFrom(score),
     score,
     reasons,
-    invalidation: direction === "long" ? "close back inside prior range" : direction === "short" ? "close back inside prior range" : null,
+    invalidation: inv,
+    whyNow: state === "TRIGGERED" ? reasons[0] ?? "" : "",
+    whyNot: state === "TRIGGERED" ? "" : join(blockers.length ? blockers : reasons),
     state,
-    trigger: "next closed 15m holds beyond the range",
+    trigger,
     blockers,
+    invalidatorPrice: direction === "long" ? (prior?.high ?? null) : direction === "short" ? (prior?.low ?? null) : null,
+    structureRead: structure.read,
   };
 }
 
@@ -195,7 +267,7 @@ export function evaluateMeanReversion(
     state = "WATCH";
     blockers.push("waiting for range/compression before fading");
   }
-  void structure;
+  void h1;
   const eligible = Boolean(direction && ranging && score >= 0.45);
   return {
     family: "mean_reversion",
@@ -205,9 +277,13 @@ export function evaluateMeanReversion(
     score,
     reasons,
     invalidation: "close back through mid-band against the fade",
+    whyNow: state === "TRIGGERED" ? reasons[0] ?? "" : "",
+    whyNot: state === "TRIGGERED" ? "" : join(blockers.length ? blockers : reasons),
     state,
     trigger: "closed stretch holds and next bar starts back toward mid",
     blockers,
+    invalidatorPrice: ind.bbMid,
+    structureRead: structure.read,
   };
 }
 
@@ -221,7 +297,7 @@ export function evaluateFamilies(
   regime: Regime,
 ): FamilyEval[] {
   return [
-    evaluateTrend(last, ind, h1, h4, structure, regime),
+    evaluateTrend(candles, last, ind, h1, h4, structure, regime),
     evaluateBreakout(candles, last, ind, h1, h4, structure, regime),
     evaluateMeanReversion(last, ind, h1, h4, structure, regime),
   ];
@@ -244,5 +320,5 @@ export function disagreement(families: FamilyEvidence[]): boolean {
 export function familyLabel(f: Family): string {
   if (f === "mean_reversion") return "Mean reversion";
   if (f === "breakout") return "Breakout";
-  return "Trend";
+  return "Trend continuation";
 }

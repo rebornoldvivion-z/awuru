@@ -1,4 +1,4 @@
-export const ENGINE_VERSION = "7.1.1";
+export const ENGINE_VERSION = "7.2.0";
 export const APP_NAME = "AWURU v7 — Discipline Desk";
 export const DB_NAME = "awuru-v7";
 export const DB_VERSION = 2;
@@ -232,6 +232,16 @@ export const DEFAULT_EQUITY = 10_000;
 export const DEFAULT_ACCOUNT_ID = "primary";
 export const LEVERAGE = 1;
 
+export const STRUCTURE_READS = [
+  "BULLISH_STRUCTURE",
+  "BEARISH_STRUCTURE",
+  "EXPANDING_RANGE",
+  "RANGE_TRANSITION",
+  "UNKNOWN",
+] as const;
+export type StructureRead = (typeof STRUCTURE_READS)[number];
+
+export const MIN_RELEASE_RR = 1.2;
 export const AGREE_SPREAD_PCT = 0.0015;
 export const DIVERGE_SPREAD_PCT = 0.005;
 export const AGREE_TS_MS = INTERVAL_MS["15m"];

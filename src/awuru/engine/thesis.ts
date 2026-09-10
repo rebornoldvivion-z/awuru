@@ -14,10 +14,13 @@ export function thesisFrom(d: Decision): Thesis {
     direction: d.direction,
     family: d.family,
     state: d.lifecycle,
-    evidence: d.best?.reasons[0] ?? d.waitDetail ?? d.quality.reason,
+    evidence: d.whyNow || d.best?.reasons[0] || d.waitDetail || d.quality.reason,
     invalidation: d.invalidation,
     sourceQuality: d.corroboration?.status ?? d.quality.state,
     engineVersion: ENGINE_VERSION,
+    structureRead: d.structure?.read ?? null,
+    whyNow: d.whyNow,
+    whyNot: d.whyNot,
   };
 }
 
@@ -32,6 +35,7 @@ export function compareThesis(prev: Thesis | null, next: Thesis): ThesisChange {
     if (next.state === "TRIGGERED" && prev.state !== "TRIGGERED") return "STRENGTHENED";
     if (next.state === "WATCH" && prev.state === "TRIGGERED") return "WEAKENED";
     if (next.state === "RELEASED" && prev.state !== "RELEASED") return "STRENGTHENED";
+    if (prev.structureRead && next.structureRead && prev.structureRead !== next.structureRead) return "NEW_SETUP";
     return "UNCHANGED";
   }
   if (prev.family !== next.family || prev.regime !== next.regime) return "NEW_SETUP";
@@ -44,5 +48,32 @@ export function changeCopy(change: ThesisChange): string {
   if (change === "INVALIDATED") return "Previous thesis invalidated";
   if (change === "REVERSED") return "Direction reversed";
   if (change === "NEW_SETUP") return "New setup";
+  return "Thesis unchanged";
+}
+
+export function describeThesisShift(prev: Thesis | null, next: Thesis): string {
+  const change = compareThesis(prev, next);
+  if (!prev) return next.whyNow || "New setup";
+  if (change === "REVERSED") {
+    return `Direction reversed ${prev.direction} → ${next.direction}`;
+  }
+  if (change === "INVALIDATED") {
+    return next.whyNot || `Thesis invalidated: ${next.evidence}`;
+  }
+  if (prev.structureRead && next.structureRead && prev.structureRead !== next.structureRead) {
+    return `Structure ${prev.structureRead} → ${next.structureRead}`;
+  }
+  if (prev.regime && next.regime && prev.regime !== next.regime) {
+    return `Regime ${prev.regime} → ${next.regime}`;
+  }
+  if (change === "STRENGTHENED") {
+    return next.whyNow || `State ${prev.state} → ${next.state}`;
+  }
+  if (change === "WEAKENED") {
+    return next.whyNot || `State ${prev.state} → ${next.state}`;
+  }
+  if (change === "NEW_SETUP") {
+    return next.whyNow || `${next.family ?? "setup"} ${next.userDecision}`;
+  }
   return "Thesis unchanged";
 }

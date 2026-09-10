@@ -61,14 +61,37 @@ export function ThesisCard(props: {
       <div className="rounded-xl border border-border bg-raised px-4 py-3">
         <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-subtle">Thesis</p>
         <Row k="Regime" v={d?.regime ? `${d.regime.kind} · ${d.regime.direction}` : "—"} />
-        <Row k="Structure" v={d?.structure?.pattern ?? "—"} />
-        <Row k="MTF" v={`15m ${d?.direction ?? "—"} / 1h ${d?.htf.h1Bias ?? "—"} / 4h ${d?.htf.h4Bias ?? "—"}`} />
-        <Row k="1h / 4h stance" v={`${d?.htfStance.h1} / ${d?.htfStance.h4}`} />
+        <Row k="Structure" v={d?.structure ? `${d.structure.read} (${d.structure.pattern})` : "—"} />
+        <Row k="15m" v={d?.direction ? `${d.direction} · ${d.lifecycle}` : "—"} />
+        <Row
+          k="1h"
+          v={
+            d?.htf.h1
+              ? `${d.htf.h1.bias} · ${d.htf.h1.regime} · ADX ${d.htf.h1.adx.toFixed(0)} · ${d.htf.h1.structureRead}`
+              : `${d?.htf.h1Bias ?? "—"}`
+          }
+        />
+        <Row
+          k="4h"
+          v={
+            d?.htf.h4
+              ? `${d.htf.h4.bias} · ${d.htf.h4.regime} · ADX ${d.htf.h4.adx.toFixed(0)} · ${d.htf.h4.structureRead}`
+              : `${d?.htf.h4Bias ?? "—"}`
+          }
+        />
         <Row k="Source" v={`${d?.venue ?? "—"} · ${d?.corroboration?.status ?? d?.quality.state ?? "—"}`} />
-        <Row k="Quality" v={d?.quality.state ?? "—"} />
-        {d?.htf.h4ClosedOpen && <Row k="Last closed 4h" v={formatClock(d.htf.h4ClosedOpen)} />}
+        {d?.whyNow ? <Row k="Why now" v={d.whyNow} /> : null}
+        {d?.whyNot ? <Row k="Why not" v={d.whyNot} /> : null}
         {d?.invalidation && <Row k="Invalid if" v={d.invalidation} />}
         {d?.trigger && <Row k="Trigger" v={d.trigger} />}
+        {d?.geometry && (
+          <>
+            <Row k="Entry / stop" v={`${d.geometry.entry} / ${d.geometry.stop}`} />
+            <Row k="Targets" v={`${d.geometry.tp1} · ${d.geometry.tp2} · ${d.geometry.tp3}`} />
+            <Row k="RR" v={`${d.geometry.rr.toFixed(2)} · ${d.geometry.tp1Source}`} />
+            <Row k="Stop from" v={d.geometry.stopSource} />
+          </>
+        )}
         {d?.size && d.size.ok && <Row k="Risk cash" v={d.size.riskCash.toFixed(2)} />}
         <Row k="Persona R" v={`${props.persona} · R ${props.riskDay.realizedR}`} />
       </div>

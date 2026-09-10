@@ -1,3 +1,4 @@
+import type { StructureRead } from "../domain/constants.ts";
 import type { Candle, Direction, Structure, SwingPoint } from "../domain/types.ts";
 
 const LEFT = 2;
@@ -20,6 +21,30 @@ export function swingPoints(candles: Candle[]): SwingPoint[] {
     else if (isLow) out.push({ openTime: c.openTime, price: c.low, kind: "low" });
   }
   return out;
+}
+
+export function interpretPattern(pattern: Structure["pattern"]): StructureRead {
+  if (pattern === "hh_hl") return "BULLISH_STRUCTURE";
+  if (pattern === "lh_ll") return "BEARISH_STRUCTURE";
+  if (pattern === "hh_ll") return "EXPANDING_RANGE";
+  if (pattern === "lh_hl") return "RANGE_TRANSITION";
+  return "UNKNOWN";
+}
+
+export function patternLabel(pattern: Structure["pattern"]): string {
+  if (pattern === "hh_hl") return "HH/HL";
+  if (pattern === "lh_ll") return "LH/LL";
+  if (pattern === "hh_ll") return "HH+LL";
+  if (pattern === "lh_hl") return "LH+HL";
+  return "undefined";
+}
+
+export function readLabel(read: StructureRead): string {
+  if (read === "BULLISH_STRUCTURE") return "BULLISH — HH/HL";
+  if (read === "BEARISH_STRUCTURE") return "BEARISH — LH/LL";
+  if (read === "EXPANDING_RANGE") return "EXPANDING RANGE — HH+LL";
+  if (read === "RANGE_TRANSITION") return "RANGE/TRANSITION — LH+HL";
+  return "UNKNOWN";
 }
 
 export function readStructure(candles: Candle[], priorRange?: { high: number; low: number } | null): Structure {
@@ -65,7 +90,8 @@ export function readStructure(candles: Candle[], priorRange?: { high: number; lo
   const reclaim =
     Boolean(last && priorRange && last.open < priorRange.high && last.close > priorRange.high) ||
     Boolean(last && priorRange && last.open > priorRange.low && last.close < priorRange.low);
-  const reasons: string[] = [`structure ${pattern}`];
+  const read = interpretPattern(pattern);
+  const reasons: string[] = [`structure ${patternLabel(pattern)} → ${read}`];
   if (breakout !== "none") reasons.push(`${breakout} ${breakoutDir} of prior range`);
   return {
     lastSwingHigh,
@@ -73,6 +99,7 @@ export function readStructure(candles: Candle[], priorRange?: { high: number; lo
     priorSwingHigh,
     priorSwingLow,
     pattern,
+    read,
     rangeHigh,
     rangeLow,
     breakout,
@@ -82,11 +109,49 @@ export function readStructure(candles: Candle[], priorRange?: { high: number; lo
   };
 }
 
+export function invalidatorPrice(structure: Structure, direction: Direction): number | null {
+  if (direction === "long") return structure.lastSwingLow?.price ?? structure.rangeLow;
+  return structure.lastSwingHigh?.price ?? structure.rangeHigh;
+}
+
 export function structureInvalidation(structure: Structure, direction: Direction): string {
+  const lvl = invalidatorPrice(structure, direction);
+  const label = `${patternLabel(structure.pattern)} · ${readLabel(structure.read)}`;
   if (direction === "long") {
-    const lvl = structure.lastSwingLow?.price;
-    return lvl ? `close back under swing low ${lvl}` : "close back under last higher low";
+    return lvl
+      ? `15m close back under ${lvl} (${label})`
+      : "15m close back under last swing low";
   }
-  const lvl = structure.lastSwingHigh?.price;
-  return lvl ? `close back over swing high ${lvl}` : "close back over last lower high";
+  return lvl
+    ? `15m close back over ${lvl} (${label})`
+    : "15m close back over last swing high";
+}
+
+export function continuationLocation(
+  candles: Candle[],
+  last: Candle,
+  emaFast: number,
+  atr: number,
+  direction: Direction,
+): { pulled: boolean; reclaimed: boolean; note: string } {
+  const look = candles.slice(-8);
+  const band = Math.max(atr * 0.35, last.close * 0.0004);
+  if (direction === "long") {
+    const pulled = look.some((c) => c.low <= emaFast + band);
+    const reclaimed = pulled && last.close > emaFast && last.close >= last.open;
+    const note = !pulled
+      ? "no pullback into EMA21 / mean yet"
+      : reclaimed
+        ? "pullback into EMA21 then closed back above"
+        : "pullback into EMA21, reclaim not closed";
+    return { pulled, reclaimed, note };
+  }
+  const pulled = look.some((c) => c.high >= emaFast - band);
+  const reclaimed = pulled && last.close < emaFast && last.close <= last.open;
+  const note = !pulled
+    ? "no pullback into EMA21 / mean yet"
+    : reclaimed
+      ? "pullback into EMA21 then closed back below"
+      : "pullback into EMA21, rejection not closed";
+  return { pulled, reclaimed, note };
 }

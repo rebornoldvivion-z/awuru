@@ -33,7 +33,7 @@ import { applyMissionClose, applyMissionOpen } from "./risk.ts";
 import { scoreMissionGeometry, scoreShadow } from "./shadow.ts";
 import { utcDayKey } from "./time.ts";
 import { loadTape, type DataSource } from "./client-api.ts";
-import { changeCopy, compareThesis, thesisFrom } from "./engine/thesis.ts";
+import { compareThesis, describeThesisShift, thesisFrom } from "./engine/thesis.ts";
 import type {
   Decision,
   LifecycleEvent,
@@ -193,7 +193,7 @@ export const useSession = create<Session>((set, get) => ({
       d.thesisChange = change;
       await saveThesis(nextThesis);
       if (change !== "UNCHANGED") {
-        await addEvent({ id: newId("evt"), at: t, type: "thesis", detail: `${changeCopy(change)} · ${reason}` });
+        await addEvent({ id: newId("evt"), at: t, type: "thesis", detail: `${describeThesisShift(prev, nextThesis)} · ${reason}` });
         const lc: LifecycleEvent = {
           id: newId("life"),
           at: t,
@@ -295,7 +295,7 @@ export const useSession = create<Session>((set, get) => ({
         scanning: false,
         thesis: nextThesis,
         thesisChange: change,
-        changeNote: reason === "15m-close" ? `15m closed · ${changeCopy(change)}` : changeCopy(change),
+        changeNote: reason === "15m-close" ? `15m closed · ${describeThesisShift(prev, nextThesis)}` : describeThesisShift(prev, nextThesis),
       });
       void listLifecycle();
     } catch (err) {

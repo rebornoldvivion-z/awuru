@@ -71,6 +71,8 @@ export type FamilyEvidence = {
   score: number;
   reasons: string[];
   invalidation: string | null;
+  whyNow: string;
+  whyNot: string;
 };
 
 export type Geometry = {
@@ -83,6 +85,9 @@ export type Geometry = {
   riskPerUnit: number;
   rr: number;
   expiry: number;
+  invalidatorPrice: number;
+  stopSource: string;
+  tp1Source: string;
 };
 
 export type SizeResult =
@@ -130,6 +135,8 @@ export type Decision = {
     h4Bias: Direction | "neutral";
     h1ClosedOpen: number | null;
     h4ClosedOpen: number | null;
+    h1: TfContext | null;
+    h4: TfContext | null;
   };
   evidenceGrade: EvidenceGrade | null;
   engineVersion: string;
@@ -149,6 +156,8 @@ export type Decision = {
   trigger: string | null;
   invalidation: string | null;
   blockedByRisk: boolean;
+  whyNow: string | null;
+  whyNot: string | null;
 };
 
 export type StoredSignal = {
@@ -282,6 +291,7 @@ export type Structure = {
   priorSwingHigh: SwingPoint | null;
   priorSwingLow: SwingPoint | null;
   pattern: "hh_hl" | "lh_ll" | "hh_ll" | "lh_hl" | "undefined";
+  read: import("./constants.ts").StructureRead;
   rangeHigh: number | null;
   rangeLow: number | null;
   breakout: "none" | "wick" | "close";
@@ -318,6 +328,14 @@ export type Corroboration = {
   reason: string;
 };
 
+export type TfContext = {
+  bias: Direction | "neutral";
+  adx: number;
+  structureRead: import("./constants.ts").StructureRead;
+  regime: import("./constants.ts").RegimeKind;
+  role: string;
+};
+
 export type Candidate = {
   family: import("./constants.ts").Family;
   direction: Direction;
@@ -330,9 +348,13 @@ export type Candidate = {
   h4: import("./constants.ts").HtfStance;
   trigger: string;
   invalidation: string;
+  invalidatorPrice: number | null;
   blockers: string[];
   reasons: string[];
   geometry: Geometry | null;
+  whyNow: string;
+  whyNot: string;
+  structureRead: import("./constants.ts").StructureRead | null;
 };
 
 export type Thesis = {
@@ -350,6 +372,9 @@ export type Thesis = {
   invalidation: string | null;
   sourceQuality: string;
   engineVersion: string;
+  structureRead: import("./constants.ts").StructureRead | null;
+  whyNow: string | null;
+  whyNot: string | null;
 };
 
 export type LifecycleEvent = {

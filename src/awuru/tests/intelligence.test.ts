@@ -177,14 +177,17 @@ describe("candidates + ranking", () => {
       {
         family: "trend" as const, eligible: true, direction: "long" as const, grade: "mixed" as const, score: 0.6,
         reasons: ["t"], invalidation: "x", state: "TRIGGERED" as const, trigger: "ema", blockers: [],
+        whyNow: "t", whyNot: "", invalidatorPrice: 90, structureRead: "BULLISH_STRUCTURE" as const,
       },
       {
         family: "breakout" as const, eligible: true, direction: "long" as const, grade: "weak" as const, score: 0.3,
         reasons: ["b"], invalidation: "y", state: "WATCH" as const, trigger: "close", blockers: ["wick"],
+        whyNow: "", whyNot: "wick", invalidatorPrice: 91, structureRead: "BULLISH_STRUCTURE" as const,
       },
       {
         family: "mean_reversion" as const, eligible: false, direction: "short" as const, grade: "weak" as const, score: 0.2,
         reasons: ["m"], invalidation: "z", state: "FORMING" as const, trigger: "band", blockers: ["trend"],
+        whyNow: "", whyNot: "trend", invalidatorPrice: 100, structureRead: "RANGE_TRANSITION" as const,
       },
     ];
     const regime = { kind: "TREND" as const, direction: "long" as const, volatility: "normal" as const, adx: 28, bbWidthPct: 0.05, atrPct: 0.01, reasons: [] };
@@ -201,7 +204,8 @@ describe("thesis compare", () => {
   const t = (over: Partial<Thesis>): Thesis => ({
     id: "thesis", asset: "BTC", at: 1, barOpen: 1, venue: "binance", regime: "TREND",
     userDecision: "WATCH", direction: "long", family: "breakout", state: "WATCH",
-    evidence: "e", invalidation: "x", sourceQuality: "LIVE", engineVersion: "7.1.0", ...over,
+    evidence: "e", invalidation: "x", sourceQuality: "LIVE", engineVersion: "7.2.0",
+    structureRead: "BULLISH_STRUCTURE", whyNow: "e", whyNot: null, ...over,
   });
   it("detects strengthen / reverse / new", () => {
     assert.equal(compareThesis(null, t({})), "NEW_SETUP");
