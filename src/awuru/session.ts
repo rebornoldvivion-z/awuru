@@ -27,7 +27,7 @@ import {
 import { applyMissionClose, applyMissionOpen } from "./risk.ts";
 import { scoreMissionGeometry, scoreShadow } from "./shadow.ts";
 import { utcDayKey } from "./time.ts";
-import { loadMtfBundle } from "./venues.ts";
+import { loadTape, type DataSource } from "./client-api.ts";
 import type {
   Decision,
   Mission,
@@ -55,6 +55,7 @@ type Session = {
   signals: StoredSignal[];
   events: EventRow[];
   now: number;
+  dataSource: DataSource | null;
   hydrate: () => Promise<void>;
   setAsset: (a: Asset) => void;
   scan: () => Promise<void>;
@@ -78,6 +79,7 @@ export const useSession = create<Session>((set, get) => ({
   signals: [],
   events: [],
   now: 0,
+  dataSource: null,
 
   hydrate: async () => {
     try {
@@ -126,12 +128,12 @@ export const useSession = create<Session>((set, get) => ({
     const t = Date.now();
     set({ now: t });
     try {
-      const loaded = await loadMtfBundle(asset, t);
+      const loaded = await loadTape(asset, t);
       const d = decide({
         bundle: loaded.bundle,
         profile,
         riskDay,
-        now: t,
+        now: loaded.now,
         accountId: DEFAULT_ACCOUNT_ID,
       });
       if (loaded.errors.length) {
@@ -219,6 +221,7 @@ export const useSession = create<Session>((set, get) => ({
         signals: await listSignals(),
         events: await listEvents(),
         riskDay: await loadRiskDay(utcDayKey(t)),
+        dataSource: loaded.source,
         scanning: false,
       });
     } catch (err) {
