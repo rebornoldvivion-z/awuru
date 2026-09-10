@@ -1,8 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { DeskApp } from "@/components/awuru/desk-app.tsx";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/journal")({ component: JournalPage });
-
-function JournalPage() {
-  return <DeskApp surface="journal" />;
-}
+export const Route = createFileRoute("/journal")({
+  beforeLoad: () => {
+    throw redirect({ to: "/ledger" });
+  },
+});
