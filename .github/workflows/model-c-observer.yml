@@ -21,12 +21,12 @@ jobs:
     steps:
       - name: Invoke Render observer
         env:
-          OBSERVER_URL: ${{ secrets.AWURU_OBSERVER_URL }}
+          OBSERVER_URL: https://awuru-model-c-observer.onrender.com
           OBSERVER_SECRET: ${{ secrets.AWURU_OBSERVER_SECRET }}
         run: |
           set -euo pipefail
-          if [ -z "${OBSERVER_URL:-}" ] || [ -z "${OBSERVER_SECRET:-}" ]; then
-            echo "AWURU_OBSERVER_URL / AWURU_OBSERVER_SECRET missing"
+          if [ -z "${OBSERVER_SECRET:-}" ]; then
+            echo "AWURU_OBSERVER_SECRET missing — add it in GitHub Actions secrets"
             exit 1
           fi
           BASE="${OBSERVER_URL%/}"
