@@ -13,9 +13,9 @@ JWKS: https://olughqzjqfecqccjzrna.supabase.co/auth/v1/.well-known/jwks.json
 Migration: supabase/migrations/20260913000001_stage1_foundation.sql
 Applied: 2026-09-16T00:59:57.244Z
 Verified: GATE A PASS — HOSTED_STAGE1_VERIFIED
-Render web: not provisioned (no Render API token in this workbench)
-Render worker: not provisioned on Render.com
-Observation: staging observer process uses hosted Supabase (not production DNS)
+Render web: Free web observer (pending live service id)
+Render worker: not used (paid worker rejected)
+Observation: SCHEDULED CLOUD OBSERVER — not 24/7
 ```
 
 Public/runtime mapping:

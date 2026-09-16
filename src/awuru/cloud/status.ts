@@ -1,6 +1,6 @@
 /**
  * Model C stage status.
- * Gate A is hosted-verified. Render.com is not provisioned from this workbench.
+ * Paid Render workers are rejected. Observation is a scheduled Free-web cycle.
  * Cloud is not production-authoritative.
  */
 
@@ -9,8 +9,11 @@ export const MODEL_C_STATUS = {
   stage1: "pass",
   stage2: "in_progress",
   gateA: "pass",
+  gateBFree: "in_progress",
   hostedSupabase: "attached",
-  render: "not_provisioned",
+  render: "free_web_pending",
+  renderWorker: "rejected_no_budget",
+  observerMode: "scheduled",
   workerStatus: "not_provisioned",
   cloudAuthoritative: false,
   parity: "in_progress",

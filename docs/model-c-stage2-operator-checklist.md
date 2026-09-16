@@ -1,9 +1,7 @@
 # Model C Stage 2 — operator checklist
 
-Gate A is **FAIL / BLOCKED** until every item in Supabase + Migration + Verification is done.  
-Do not skip steps. Do not create Render services first. Do not invent credentials.
-
-Current canonical worker status: `not_provisioned`.
+Gate A is **PASS**. Paid Render workers are **rejected**.  
+Current observer: **SCHEDULED CLOUD OBSERVER** ($0). Canonical worker_status default remains `not_provisioned` until a cycle writes `scheduled`.
 
 ## Environment variable contract
 
@@ -18,6 +16,7 @@ Server-only:
 
 ```
 AWURU_SUPABASE_SERVICE_ROLE_KEY
+AWURU_OBSERVER_SECRET
 ```
 
 Required for any Model C infrastructure process:
@@ -28,87 +27,40 @@ AWURU_ENGINE_VERSION=7.3.0
 AWURU_CONTRACT_VERSION=c-1
 ```
 
+GitHub Actions (waker only):
+
+```
+AWURU_OBSERVER_URL
+AWURU_OBSERVER_SECRET
+```
+
 Never:
 
 - `VITE_*SERVICE_ROLE*`
 - `DATABASE_URL` (App Builder Neon — unused for Model C)
-- service role, database password, or private tokens in git / frontend / `/api/health`
-
-Environments: `development` | `staging` | `production`.  
-The worker may run against **staging only**. Production is refused until cutover authorization.
+- service role, database password, observer secret, or private tokens in git / frontend / `/api/health`
 
 ## Supabase
 
-- [ ] Create one Free staging project (not production, not a second architecture, not Neon)
-- [ ] Record project ref in `docs/environment-staging.md`
-- [ ] Record region
-- [ ] Record project URL
-- [ ] Record plan = Free
-- [ ] Verify classification = staging
-- [ ] Keep service role server-side only
+- [x] Create one Free staging project
+- [x] Record project ref in `docs/environment-staging.md`
+- [x] Apply **ONLY** `supabase/migrations/20260913000001_stage1_foundation.sql`
+- [x] `npm run model-c:verify-hosted` → GATE A PASS
 
-## Migration
+## $0 observer (required)
 
-Apply **ONLY**:
+- [ ] Create Render **Free web** service from `docs/render.free-web.yaml` (not a background worker)
+- [ ] Set server env + `AWURU_OBSERVER_SECRET`
+- [ ] Put `.github/workflows/model-c-observer.yml` on the **default branch** (GitHub only schedules default-branch workflows)
+- [ ] Set Actions secrets `AWURU_OBSERVER_URL` and `AWURU_OBSERVER_SECRET`
+- [ ] Manual `workflow_dispatch` succeeds
+- [ ] Scheduled run succeeds
+- [ ] Tape parity 100%, engine parity 0 mismatches
+- [ ] Fail-closed: bad secret 401, lease overlap 409, provider failure does not advance checkpoint
 
-```
-supabase/migrations/20260913000001_stage1_foundation.sql
-```
+## Paid Render worker
 
-Do not recreate tables by hand. Do not apply `/workspace/migrations` (Neon). Do not add undocumented production-only SQL.
-
-## Verification
-
-Run hosted verification. It must connect to the real project. Failure to connect is failure, not success.
-
-```
-npm run model-c:verify-hosted
-```
-
-That script must pass:
-
-- [ ] hosted schema verification
-- [ ] hosted RLS verification
-- [ ] hosted hash verification (`canonicalPayload()` → `inputHash()` → `decisions.input_hash`, plus `decision_hash`)
-- [ ] hosted candle conflict tests (duplicate = no-op, different OHLC = conflict, canonical unchanged)
-- [ ] hosted thesis / event / decision tests
-- [ ] Gold identity remains PAXGUSDT / TOKENIZED_GOLD_PROXY
-- [ ] `system_health.worker_status` is still `not_provisioned` until a worker exists
-
-If any check fails: **STOP**. Do not lower the gate.
-
-## Render
-
-Only after the hosted database passes:
-
-- [ ] create staging web service
-- [ ] create staging worker
-- [ ] connect staging credentials (server-side)
-- [ ] refuse production targeting
-
-Do not migrate DNS. Do not change the public Command Center.
-
-Template (not provisioned): `docs/render.staging.template.yaml`
-
-## Parity
-
-Only after the worker exists and is ingesting staging data:
-
-```
-npm run model-c:tape-parity
-npm run model-c:engine-parity
-```
-
-- [ ] tape parity (identity, OHLC exact, close status, timestamps)
-- [ ] engine parity (userDecision, waitCode, lifecycle, family, research qualification, regime, structure, direction, input_hash, decision_hash)
-- [ ] reconnect
-- [ ] gap fill
-- [ ] duplicate handling
-- [ ] health
-
-Tape target: ≥99.9% primary closed-bar parity with exact OHLC equality.  
-Engine target: zero mismatches on contracted fields.  
-Do not start these as live measurements while Gate A is blocked. The scripts currently exit blocked.
+Optional future infrastructure. Not required. Template remains `docs/render.staging.template.yaml` (**NOT PROVISIONED**).
 
 ## RESUME MODEL C STAGE 2
 
@@ -116,12 +68,12 @@ Do not start these as live measurements while Gate A is blocked. The scripts cur
 2. Record project metadata.
 3. Apply Stage 1 migration.
 4. Run hosted Stage 1 verification.
-5. If PASS → create Render staging web.
-6. Create Render observation worker.
-7. Begin canonical tape ingestion.
+5. If PASS → create Render **Free web** observer (not a paid worker).
+6. Put the GitHub Actions waker on the default branch.
+7. Begin canonical tape ingestion via scheduled POST `/internal/model-c/observe`.
 8. Run tape parity.
 9. Run engine parity.
-10. Run recovery tests.
+10. Run recovery / idempotency / lease tests.
 11. Produce Stage 2 parity report.
 
 No step may be skipped.

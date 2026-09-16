@@ -1,6 +1,14 @@
 # AWURU Model C — Render STAGING template
-# NOT PROVISIONED. Gate A has passed. This file is not proof that Render exists.
-# A Render API token is still required before these services can be created.
+# NOT PROVISIONED.
+# Gate A: PASS. Gate B: BLOCKED — Render account has no payment method.
+# 2026-09-16 validation:
+#   API auth OK — workspace tea-dafoh72d0e5s73d9r05g ("My Workspace")
+#   POST background_worker plan=starter → HTTP 402
+#     "Payment information is required... https://dashboard.render.com/billing"
+#   POST background_worker plan=free → HTTP 400
+#     "only web services allowed for plan"
+# Do not convert this worker into a free web service. That is not Gate B.
+# Existing production-adjacent service srv-dah0cte1egvs73c14ku0 (awuru) must not be modified.
 
 services:
   - type: web
@@ -28,6 +36,8 @@ services:
     env: node
     plan: starter
     autoDeploy: false
+    branch: model-c-staging
+    repo: https://github.com/rebornoldvivion-z/awuru
     startCommand: npm run model-c:worker:loop
     envVars:
       - key: AWURU_CLOUD_ENV
@@ -36,6 +46,8 @@ services:
         value: "7.3.0"
       - key: AWURU_CONTRACT_VERSION
         value: c-1
+      - key: NODE_VERSION
+        value: "22"
       - key: AWURU_SUPABASE_URL
         sync: false
       - key: AWURU_SUPABASE_SERVICE_ROLE_KEY

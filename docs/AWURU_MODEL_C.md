@@ -1,34 +1,28 @@
 # AWURU Model C — freeze status
 
-**Architecture freeze:** Model C **worker-first**.  
+**Architecture:** scheduled cloud observer ($0).  
 **Production:** Model B. Engine **7.3.0**.  
 **Gate A:** **PASS**.  
-**Stage 2:** in progress. Render.com **not provisioned**. Cloud is **not** production-authoritative.
+**Gate B-FREE:** **in progress** until Render Free web + GitHub schedule have live evidence.  
+**Paid Render worker:** rejected (no billing).  
+**Cloud:** not production-authoritative.  
+**Not 24/7. Not a continuous WebSocket worker.**
 
 | Check | Status |
 |---|---|
-| Hosted project | **PASS** `olughqzjqfecqccjzrna` |
-| Stage 1 SQL | **APPLIED** `20260913000001` |
-| Hosted RLS / ingest / hashes | **PASS** |
-| Staging REST observer | **720** first-write inserts; re-run **720 unchanged / 0 conflict** |
-| Tape parity (LOOKBACK window) | **540 / 540 = 100%** exact OHLC |
-| Engine parity (BTC/ETH/GOLD) | **0 mismatches** |
-| WebSocket | **connected**; forming klines ignored (3 observed, 0 ingested) |
-| Reconnect gap-fill | **717 unchanged + 3 new closed inserts, 0 conflict** |
-| Singleton lease | **refused** `lease_held_by_staging-observer-hold` |
-| Gold | **PAXGUSDT / TOKENIZED_GOLD_PROXY** |
-| BREAKOUT | **QUARANTINED** |
-| Render.com web/worker | **NOT PROVISIONED** (no Render API token) |
+| Hosted Supabase | **PASS** `olughqzjqfecqccjzrna` |
+| Observer mode | SCHEDULED CLOUD OBSERVER |
+| Render Background Worker | not used |
+| Render Free web | pending live provision |
+| GitHub Actions waker | `.github/workflows/model-c-observer.yml` |
+| decide() location | existing `src/awuru/engine/engine.ts` only |
+| Gold | PAXGUSDT · TOKENIZED_GOLD_PROXY |
+| BREAKOUT | QUARANTINED — never EXECUTION_READY |
+| TREND | UNVALIDATED — never EXECUTION_READY |
 | Production authority | **Model B** |
 
-## Product language (frozen)
+## How it runs
 
-- **GOLD** — `PAXGUSDT · TOKENIZED GOLD PROXY`
-- TREND — historically weak / UNVALIDATED
-- BREAKOUT — QUARANTINED
+GitHub Actions (default branch schedule) → `POST /internal/model-c/observe` on a Render **Free web** process → one bounded REST cycle → Supabase Free.
 
-## Remaining before Stage 2 can PASS
-
-Provision Render staging web + one observation worker from [render.staging.template.yaml](./render.staging.template.yaml). Until then the observer exists only as `npm run model-c:worker` against staging Supabase.
-
-Identity: [environment-staging.md](./environment-staging.md)
+Render sleep is expected. Each invocation may be a cold start and must gap-fill from the checkpoint. The system never claims it observed between runs.

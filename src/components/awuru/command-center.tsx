@@ -32,9 +32,23 @@ export function CommandCenter() {
   const pulse = useSession((s) => s.pulse);
   const cards = useSession((s) => s.cards);
   const [now, setNow] = useState(() => Date.now());
+  const [observer, setObserver] = useState<{
+    observerMode?: string;
+    lastSuccessfulObservation?: string | null;
+    dataAge?: number | null;
+    observerStatus?: string;
+    productionAuthority?: string;
+    continuous?: boolean;
+  } | null>(null);
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
+  }, []);
+  useEffect(() => {
+    void fetch("/api/model-c/health")
+      .then((r) => r.json())
+      .then((j) => setObserver(j as typeof observer))
+      .catch(() => setObserver(null));
   }, []);
   const left = nextCloseAt ? nextCloseAt - now : 0;
   const anyFresh = ASSETS.some((a) => cards[a]?.decision && !cards[a]?.lastObserved);
@@ -111,8 +125,18 @@ export function CommandCenter() {
       </section>
 
       <p className="text-xs text-subtle">
-        1 BTC · 2 ETH · 3 GOLD PROXY · PAXGUSDT · R rescan · J ledger · ⌘K. Gold is PAXGUSDT proxy, not XAUUSD. No 24/7 daemon.
+        1 BTC · 2 ETH · 3 GOLD PROXY · PAXGUSDT · R rescan · J ledger · ⌘K. Gold is PAXGUSDT proxy, not XAUUSD. No 24/7
+        daemon. Cloud observer is scheduled, not continuous. Model B remains authority.
       </p>
+      {observer && (
+        <p className="font-mono text-[10px] uppercase tracking-wider text-subtle">
+          Scheduled cloud observer · {observer.observerStatus ?? observer.observerMode ?? "unverified"} · authority{" "}
+          {observer.productionAuthority ?? "model-b"}
+          {observer.continuous ? " · INVALID CONTINUOUS CLAIM" : " · not 24/7"}
+          {observer.lastSuccessfulObservation ? ` · last ${observer.lastSuccessfulObservation.slice(11, 16)} UTC` : ""}
+          {observer.dataAge != null ? ` · data age ${observer.dataAge}s` : ""}
+        </p>
+      )}
     </div>
   );
 }

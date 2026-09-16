@@ -27,6 +27,7 @@ export type WorkerLiveStatus =
   | "not_provisioned"
   | "reconciling"
   | "observing"
+  | "scheduled"
   | "reconnecting"
   | "degraded"
   | "data_gap"
@@ -43,6 +44,7 @@ export type IngestCounts = {
 
 const BACKFILL: Record<Timeframe, number> = { "15m": 120, "1h": 80, "4h": 40 };
 export const LEASE_MS = 45_000;
+export const SCHEDULED_LEASE_MS = 10 * 60_000;
 const HEARTBEAT_MS = 15_000;
 const BINANCE_WS = "wss://stream.binance.com:9443/stream";
 
@@ -50,11 +52,15 @@ function envMap(): EnvMap {
   return process.env;
 }
 
-function ownerId(): string {
-  return `staging-observer-${process.pid}`;
+export function observerOwner(): string {
+  return process.env.AWURU_OBSERVER_OWNER?.trim() || `staging-observer-${process.pid}`;
 }
 
-async function ingestClosed(
+function ownerId(): string {
+  return observerOwner();
+}
+
+export async function ingestClosed(
   url: string,
   key: string,
   args: {
@@ -121,27 +127,60 @@ export async function acquireLease(
   url: string,
   key: string,
   now = Date.now(),
-): Promise<{ ok: boolean; reason: string }> {
+  opts?: { owner?: string; leaseMs?: number; note?: string },
+): Promise<{ ok: boolean; reason: string; owner: string; previous: Record<string, unknown> }> {
   const got = await supabaseJson<
     Array<{ worker_heartbeat: string | null; feed_status: Record<string, unknown> | null }>
   >(url, key, "system_health?id=eq.awuru&select=worker_heartbeat,feed_status", { method: "GET" });
-  if (!got.ok || !got.data?.[0]) return { ok: false, reason: "health_row_missing" };
+  if (!got.ok || !got.data?.[0]) return { ok: false, reason: "health_row_missing", owner: "", previous: {} };
   const row = got.data[0];
   const beat = row.worker_heartbeat ? Date.parse(row.worker_heartbeat) : 0;
-  const owner = typeof row.feed_status?.owner === "string" ? row.feed_status.owner : "";
-  const mine = ownerId();
-  if (leaseDecision({ now, heartbeatMs: beat, owner, mine }) === "refuse") {
-    return { ok: false, reason: `lease_held_by_${owner}` };
+  const previous = row.feed_status && typeof row.feed_status === "object" ? { ...row.feed_status } : {};
+  const owner = typeof previous.owner === "string" ? previous.owner : "";
+  const mine = opts?.owner ?? ownerId();
+  if (leaseDecision({ now, heartbeatMs: beat, owner, mine, leaseMs: opts?.leaseMs }) === "refuse") {
+    return { ok: false, reason: `lease_held_by_${owner}`, owner: mine, previous };
   }
   const ok = await writeHealth(url, key, {
     worker_status: "reconciling",
     worker_heartbeat: new Date(now).toISOString(),
     database_status: "connected",
     engine_version: ENGINE_VERSION,
-    feed_status: { owner: mine, pid: process.pid, acquiredAt: now },
-    note: "Stage 2 observation worker. Not production authority.",
+    feed_status: {
+      ...previous,
+      owner: mine,
+      pid: process.pid,
+      acquiredAt: now,
+      kind: "scheduled",
+      continuous: false,
+      streaming: false,
+      productionAuthority: "model-b",
+    },
+    note: opts?.note ?? "SCHEDULED CLOUD OBSERVER. Not production authority. Not 24/7.",
   });
-  return ok ? { ok: true, reason: "acquired" } : { ok: false, reason: "lease_write_failed" };
+  return ok ? { ok: true, reason: "acquired", owner: mine, previous } : { ok: false, reason: "lease_write_failed", owner: mine, previous };
+}
+
+export async function releaseLease(
+  url: string,
+  key: string,
+  mine: string,
+  extra: Record<string, unknown> = {},
+): Promise<boolean> {
+  const got = await supabaseJson<Array<{ feed_status: Record<string, unknown> | null }>>(
+    url,
+    key,
+    "system_health?id=eq.awuru&select=feed_status",
+    { method: "GET" },
+  );
+  const previous = got.data?.[0]?.feed_status && typeof got.data[0].feed_status === "object" ? { ...got.data[0].feed_status } : {};
+  if (typeof previous.owner === "string" && previous.owner && previous.owner !== mine) {
+    return false;
+  }
+  return writeHealth(url, key, {
+    feed_status: { ...previous, ...extra, owner: "", releasedAt: Date.now() },
+    worker_heartbeat: new Date().toISOString(),
+  });
 }
 
 async function pool<T>(items: T[], n: number, fn: (item: T) => Promise<void>): Promise<void> {
@@ -292,6 +331,14 @@ export function closedKlineFromBinance(msg: unknown, _now?: number): IncomingKli
   return classified.kind === "closed" ? classified.kline : null;
 }
 
+export function eventIdFor(
+  type: string,
+  parts: Array<string | number | null | undefined>,
+): string {
+  const tail = parts.filter((p) => p !== null && p !== undefined && p !== "").join(":");
+  return tail ? `evt:${type}:${tail}` : `evt:${type}`;
+}
+
 export async function persistEvent(
   url: string,
   key: string,
@@ -302,15 +349,19 @@ export async function persistEvent(
       | "SOURCE_CONNECTED"
       | "SOURCE_DISCONNECTED"
       | "WORKER_HEARTBEAT"
-      | "SYSTEM_FAILURE";
+      | "SYSTEM_FAILURE"
+      | "CANDIDATE_CREATED"
+      | "THESIS_FORMED";
     asset?: Asset;
     detail: string;
     payload?: Record<string, unknown>;
+    id?: string;
   },
 ): Promise<boolean> {
-  const id = `evt:${event.type}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
+  const id = event.id ?? eventIdFor(event.type, [event.asset ?? "", event.detail, Date.now()]);
   const res = await supabaseJson(url, key, "events", {
     method: "POST",
+    headers: { Prefer: "return=representation,resolution=ignore-duplicates" },
     body: JSON.stringify({
       id,
       asset: event.asset ?? null,
@@ -321,7 +372,7 @@ export async function persistEvent(
       payload: event.payload ?? {},
     }),
   });
-  return res.ok;
+  return res.ok || res.status === 409;
 }
 
 export async function persistIncoming(
@@ -346,6 +397,7 @@ export async function persistIncoming(
     await persistEvent(url, key, {
       type: "CANDLE_CLOSED",
       asset,
+      id: eventIdFor("CANDLE_CLOSED", [kline.venue, kline.symbol, kline.timeframe, kline.openTime]),
       detail: `${kline.venue}|${kline.symbol}|${kline.timeframe}|${kline.openTime}`,
       payload: { venue: kline.venue, symbol: kline.symbol, timeframe: kline.timeframe, openTime: kline.openTime },
     });
@@ -353,6 +405,7 @@ export async function persistIncoming(
     await persistEvent(url, key, {
       type: "CANDLE_CONFLICT",
       asset,
+      id: eventIdFor("CANDLE_CONFLICT", [kline.venue, kline.symbol, kline.timeframe, kline.openTime]),
       detail: `conflict ${kline.venue}|${kline.symbol}|${kline.timeframe}|${kline.openTime}`,
       payload: { venue: kline.venue, symbol: kline.symbol, timeframe: kline.timeframe, openTime: kline.openTime },
     });

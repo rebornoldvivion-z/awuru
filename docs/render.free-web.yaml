@@ -1,0 +1,29 @@
+# AWURU Model C — Render FREE WEB (scheduled observer)
+# Not a background worker. Sleep after idle is expected.
+# Do not claim 24/7.
+
+services:
+  - type: web
+    name: awuru-model-c-observer
+    env: node
+    plan: free
+    autoDeploy: true
+    branch: model-c-staging
+    healthCheckPath: /api/model-c/health
+    buildCommand: node -v
+    startCommand: node --experimental-strip-types scripts/model-c/staging-web.ts
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: AWURU_CLOUD_ENV
+        value: staging
+      - key: AWURU_ENGINE_VERSION
+        value: "7.3.0"
+      - key: AWURU_CONTRACT_VERSION
+        value: c-1
+      - key: AWURU_SUPABASE_URL
+        sync: false
+      - key: AWURU_SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: AWURU_OBSERVER_SECRET
+        sync: false
