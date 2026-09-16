@@ -1,0 +1,67 @@
+# SCHEDULED CLOUD OBSERVER
+# Wakes the Render Free web service. Engine logic stays in repository TypeScript.
+# GitHub only schedules workflows on the DEFAULT branch.
+name: model-c-scheduled-observer
+
+on:
+  schedule:
+    - cron: "3,18,33,48 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: model-c-scheduled-observer
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Invoke Render observer
+        env:
+          OBSERVER_URL: https://awuru-model-c-observer.onrender.com
+          OBSERVER_SECRET: ${{ secrets.AWURU_OBSERVER_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${OBSERVER_SECRET:-}" ]; then
+            echo "AWURU_OBSERVER_SECRET missing — add it in GitHub Actions secrets"
+            exit 1
+          fi
+          BASE="${OBSERVER_URL%/}"
+          invoke() {
+            curl -sS -m 45 -D /tmp/obs-headers -o /tmp/obs-body \
+              -X POST "${BASE}/internal/model-c/observe" \
+              -H "Authorization: Bearer ${OBSERVER_SECRET}" \
+              -H "Content-Type: application/json" \
+              -w "%{http_code}" \
+              --retry 2 --retry-delay 4 --retry-all-errors
+          }
+          code="$(invoke || true)"
+          echo "HTTP ${code}"
+          head -c 4000 /tmp/obs-body || true
+          echo
+          if [ "$code" = "202" ]; then
+            for i in 1 2 3 4 5 6 7 8; do
+              sleep 8
+              health="$(curl -sS -m 20 "${BASE}/api/model-c/health" || true)"
+              echo "$health" | head -c 1500
+              echo
+              echo "$health" | grep -q '"status":"SUCCESS"' && exit 0
+              echo "$health" | grep -q '"observerStatus":"LEASE_BLOCKED"' && exit 0
+              echo "$health" | grep -q '"status":"FAILED"' && exit 1
+            done
+            echo "cycle did not finish while polling"
+            exit 1
+          fi
+          if [ "$code" = "200" ]; then
+            grep -q '"status":"SUCCESS"' /tmp/obs-body
+            exit $?
+          fi
+          if [ "$code" = "409" ]; then
+            echo "LEASE_BLOCKED — overlapping observer refused (safe)"
+            exit 0
+          fi
+          echo "observer failed"
+          exit 1
