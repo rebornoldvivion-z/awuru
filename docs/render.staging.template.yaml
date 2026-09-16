@@ -1,0 +1,42 @@
+# AWURU Model C — Render STAGING template
+# NOT PROVISIONED. Gate A has passed. This file is not proof that Render exists.
+# A Render API token is still required before these services can be created.
+
+services:
+  - type: web
+    name: awuru-model-c-staging-web
+    env: node
+    plan: starter
+    autoDeploy: false
+    startCommand: npm run model-c:staging-web
+    envVars:
+      - key: AWURU_CLOUD_ENV
+        value: staging
+      - key: AWURU_ENGINE_VERSION
+        value: "7.3.0"
+      - key: AWURU_CONTRACT_VERSION
+        value: c-1
+      - key: AWURU_SUPABASE_URL
+        sync: false
+      - key: AWURU_SUPABASE_ANON_KEY
+        sync: false
+      - key: AWURU_SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+  - type: worker
+    name: awuru-model-c-staging-worker
+    env: node
+    plan: starter
+    autoDeploy: false
+    startCommand: npm run model-c:worker:loop
+    envVars:
+      - key: AWURU_CLOUD_ENV
+        value: staging
+      - key: AWURU_ENGINE_VERSION
+        value: "7.3.0"
+      - key: AWURU_CONTRACT_VERSION
+        value: c-1
+      - key: AWURU_SUPABASE_URL
+        sync: false
+      - key: AWURU_SUPABASE_SERVICE_ROLE_KEY
+        sync: false
